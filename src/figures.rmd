@@ -1,0 +1,907 @@
+
+
+```{r}
+library("tidyverse")
+library(viridis)
+library(scales)
+```
+
+```{r Make folders}
+ifelse(!dir.exists(paths = "../output/figs"), dir.create(file.path("../output/figs")), FALSE)
+
+folder_names <- c("benchmarking_minimap", 
+                  "benchmarking_strobemap",
+                  "entropy_pmatch",
+                  "matching_analysis_bio",
+                  "matching_analysis_sim",
+                  "overlap",
+                  "uniqueness_esize")
+
+for (folder_name in folder_names){
+  ifelse(!dir.exists(paths = paste("../output/figs/", folder_name, sep="")),
+       dir.create(file.path(paste("../output/figs/", folder_name, sep=""))),
+       FALSE)
+}
+```
+
+```{r Code for Fig. 1}
+
+```
+
+```{r Code for Fig. 2a}
+results_entropy <- read.table("../output/data tables/p_match/25-50_FINAL_100k_itr.csv", header=T, sep=",")
+results_entropy$seeding <- factor(results_entropy$seeding, levels= c("k-mers", "minstrobes", "hybridstrobes", "randstrobes", "mixedstrobes", "altstrobes")) 
+
+ggplot(results_entropy)+
+  geom_line(aes(x = m, y = N_m, col=seeding))+
+  scale_x_continuous(breaks=c(1,5, 10, 15, 20, 25))+
+  theme(legend.position = "bottom")+
+  labs(y=expression(P(N[m] > 0)))+
+  scale_color_manual(values = c("#F8766D", "#A3A500", "#00BF7D", "#00B0F6", "blue", "#E76BF3"))
+ggsave("../output/figs/entropy_pmatch/fig_2a_p_match-25-50.pdf", width = 5, height = 5)
+ggsave("../output/figs/entropy_pmatch/fig_2a_p_match-25-50.png", width = 5, height = 5)
+```
+
+```{r Code for Fig. 2b/c and Suppl. Fig. 1}
+results_entropy_all <- rbind(
+  read.table("../output/data tables/p_match/16-100.csv", header=T, sep=","),
+  read.table("../output/data tables/p_match/16-50.csv", header=T, sep=","),
+  read.table("../output/data tables/p_match/25-100.csv", header=T, sep=","),
+  read.table("../output/data tables/p_match/25-50.csv", header=T, sep=","),
+  read.table("../output/data tables/p_match/35-50.csv", header=T, sep=","),
+  read.table("../output/data tables/p_match/45-50.csv", header=T, sep=","),
+  read.table("../output/data tables/p_match/49-50.csv", header=T, sep=","),
+  read.table("../output/data tables/p_match/50-100.csv", header=T, sep=","),
+  read.table("../output/data tables/p_match/75-100.csv", header=T, sep=","),
+  read.table("../output/data tables/p_match/95-100.csv", header=T, sep=","),
+  read.table("../output/data tables/p_match/99-100.csv", header=T, sep=",")) %>% 
+  mutate(type = ifelse(type == "mixed-randstrobes", "mixedstrobes", type),
+         window = paste("W = [", w_min, ",", w_max, "]", sep = ""),
+         w_max = paste("w_max = ", w_max, sep="")) %>% 
+  filter(type != "Optimal")
+
+#results_entropy_all <- rbind(
+#  results_entropy_all,
+#  results_entropy_all %>% filter(type == "Optimal" & x == 30) %>% mutate(analysis = "mixedstrobes-analysis", x = 0),
+#  results_entropy_all %>% filter(type == "Optimal" & x == 30) %>% mutate(analysis = "mixedstrobes-analysis", x = 1)
+#)
+
+
+# unique(results_entropy_all$w_max)             
+
+results_entropy_all$w_min <- factor(results_entropy_all$w_min, levels = c(16, 25, 35, 45, 49, 50, 75, 95, 99))
+#results_entropy_all$type <- factor(results_entropy_all$type, levels= c("Optimal", "k-mers", "altstrobes", "randstrobes", "mixedstrobes")) 
+results_entropy_all$type <- factor(results_entropy_all$type, levels= c("k-mers", "altstrobes", "randstrobes", "mixedstrobes"))
+results_entropy_all$window <- factor(results_entropy_all$window, levels = c("W = [16,50]", "W = [25,50]", "W = [35,50]", "W = [45,50]", "W = [49,50]", "W = [16,100]", "W = [25,100]", "W = [50,100]", "W = [75,100]", "W = [95,100]", "W = [99,100]"))
+results_entropy_all$w_max <- factor(results_entropy_all$w_max, levels = c("w_max = 50", "w_max = 100"))
+results_entropy_all
+
+results_entropy_all <- results_entropy_all %>% mutate(x = ifelse(x == 30, 0, x))
+
+ggplot(results_entropy_all %>% filter(ymetric == "Entropy" & w_max == "w_max = 50"), aes(group = interaction(w_min,type)))+
+  geom_line(aes(x = x, y = y, col = type), size=0.25)+
+  geom_point(aes(x = x, y = y, fill = type, shape = w_min), size = 2, stroke = 0.25)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "bottom",
+        legend.box="vertical",
+        legend.margin=margin())+
+  labs(x = "    Length k[s]                     fraction strobemers",
+       y = "Entropy")+
+  scale_color_manual(values = c("#F8766D", "#E76BF3", "#00B0F6", "blue"))+
+  scale_fill_manual(values = c("#F8766D", "#E76BF3", "#00B0F6", "blue"))+
+  scale_size_manual(values = c(1,1,1,1))+
+  scale_shape_manual(values = c(21,24,23,22,25))+
+  facet_grid(w_max ~ analysis, scales = "free")+
+  #expand_limits(x = 0, y = 0)+
+  guides(shape = guide_legend(order = 2),col = guide_legend(order = 1), size = "none", linetype = "none", fill = "none")
+ggsave("../output/figs/entropy_pmatch/fig_2b_entropy50.png", width = 5, height = 5)
+ggsave("../output/figs/entropy_pmatch/fig_2b_entropy50.pdf", width = 5, height = 5)
+
+ggplot(results_entropy_all %>% filter(ymetric == "p_match" & w_max == "w_max = 50"), aes(group = interaction(w_min,type)))+
+  geom_line(aes(x = x, y = y, col = type), size=0.25)+
+  geom_point(aes(x = x, y = y, fill = type, shape = w_min), size = 2, stroke = 0.25)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "bottom",
+        legend.box="vertical",
+        legend.margin=margin())+
+  labs(x = "    Length k[s]                     fraction strobemers",
+       y = "Sensitivity")+
+  scale_fill_manual(values = c("#F8766D", "#E76BF3", "#00B0F6", "blue"))+
+  scale_color_manual(values = c("#F8766D", "#E76BF3", "#00B0F6", "blue"))+
+  scale_shape_manual(values = c(21,24,23,22,25))+
+  facet_grid(w_max ~ analysis, scales = "free")+
+  # expand_limits(x = 0, y = 0)+
+  guides(shape = guide_legend(order = 2),col = guide_legend(order = 1), size = "none", linetype = "none", fill = "none")
+ggsave("../output/figs/entropy_pmatch/fig_2c_p_match50.png", width = 5, height = 5)
+ggsave("../output/figs/entropy_pmatch/fig_2c_p_match50.pdf", width = 5, height = 5)
+
+
+ggplot(results_entropy_all %>% filter(ymetric == "Entropy" & w_max == "w_max = 100"), aes(group = interaction(w_min,type)))+
+  geom_line(aes(x = x, y = y, col = type), size=0.25)+
+  geom_point(aes(x = x, y = y, fill = type, shape = w_min), size = 2, stroke = 0.25)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "bottom",
+        legend.box="vertical",
+        legend.margin=margin())+
+  labs(x = "    Length k[s]                     fraction strobemers",
+       y = "Entropy")+
+  scale_color_manual(values = c("#F8766D", "#E76BF3", "#00B0F6", "blue"))+
+  scale_fill_manual(values = c("#F8766D", "#E76BF3", "#00B0F6", "blue"))+
+  scale_size_manual(values = c(1,1,1,1))+
+  scale_shape_manual(values = c(21,24,23,22,25,4))+
+  facet_grid(w_max ~ analysis, scales = "free")+
+  #expand_limits(x = 0, y = 0)+
+  guides(shape = guide_legend(order = 2),col = guide_legend(order = 1), size = "none", linetype = "none", fill = "none")
+ggsave("../output/figs/entropy_pmatch/suppl_entropy100.png", width = 5, height = 5)
+ggsave("../output/figs/entropy_pmatch/suppl_entropy100.pdf", width = 5, height = 5)
+
+ggplot(results_entropy_all %>% filter(ymetric == "p_match" & w_max == "w_max = 100"), aes(group = interaction(w_min,type)))+
+  geom_line(aes(x = x, y = y, col = type), size=0.25)+
+  geom_point(aes(x = x, y = y, fill = type, shape = w_min), size = 2, stroke = 0.25)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "bottom",
+        legend.box="vertical",
+        legend.margin=margin())+
+  labs(x = "    Length k[s]                     fraction strobemers",
+       y = "Sensitivity")+
+  scale_fill_manual(values = c("#F8766D", "#E76BF3", "#00B0F6", "blue"))+
+  scale_color_manual(values = c("#F8766D", "#E76BF3", "#00B0F6", "blue"))+
+  scale_shape_manual(values = c(21,24,23,22,25, 4))+
+  facet_grid(w_max ~ analysis, scales = "free")+
+  # expand_limits(x = 0, y = 0)+
+  guides(shape = guide_legend(order = 2),col = guide_legend(order = 1), size = "none", linetype = "none", fill = "none")
+ggsave("../output/figs/entropy_pmatch/suppl_p_match100.png", width = 5, height = 5)
+ggsave("../output/figs/entropy_pmatch/suppl_p_match100.pdf", width = 5, height = 5)
+
+
+results_entropy_25_50 <- read.table("../output/data tables/p_match/25-50.csv", header=T, sep=",") %>% 
+  mutate(type = ifelse(type == "mixed-randstrobes", "mixedstrobes", type),
+         window = paste("W = [", w_min, ",", w_max, "]", sep = ""))
+
+results_entropy_25_50 <- rbind(
+  results_entropy_25_50,
+  results_entropy_25_50 %>% filter(type == "Optimal" & x == 30) %>% mutate(analysis = "mixedstrobes-analysis", x = 0),
+  results_entropy_25_50 %>% filter(type == "Optimal" & x == 30) %>% mutate(analysis = "mixedstrobes-analysis", x = 1)
+)
+
+results_entropy_25_50$type <- factor(results_entropy_25_50$type, levels= c("Optimal", "k-mers", "altstrobes", "randstrobes", "mixedstrobes")) 
+
+ggplot(results_entropy_25_50 %>% filter(ymetric == "Entropy"))+
+  geom_point(aes(x = x, y = y, col = type, size = type))+
+  geom_line(aes(x = x, y = y, col = type))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  labs(x = "    Length k[s]                     fraction strobemers",
+       y = "Entropy")+
+  scale_color_manual(values = c("black", "#F8766D", "#E76BF3", "#00B0F6", "blue"))+
+  scale_size_manual(values = c(0,1,1,1,1))+
+  facet_grid(window ~ analysis, scales = "free")+
+  expand_limits(x = 0, y = 0)
+ggsave("../output/figs/entropy_pmatch/additional_entropy_25_50.png", width = 6, height = 3.5)
+ggsave("../output/figs/entropy_pmatch/additional_entropy_25_50.pdf", width = 6, height = 3.5)
+
+ggplot(results_entropy_25_50 %>% filter(ymetric == "p_match"))+
+  geom_point(aes(x = x, y = y, col = type))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  labs(x = "    Length k[s]                     fraction strobemers",
+       y = expression(P(N[m])))+
+  scale_color_manual(values = c("#F8766D", "#E76BF3", "#00B0F6", "blue"))+
+  facet_grid(window ~ analysis, scales = "free")+
+  expand_limits(x = 0, y = 0)
+ggsave("../output/figs/entropy_pmatch/additional_p_match_25_50.png", width = 6, height = 3.5)
+ggsave("../output/figs/entropy_pmatch/additional_p_match_25_50.pdf", width = 6, height = 3.5)
+```
+
+
+```{r Code for Fig. 3 and Suppl. Fig. S5+S6}
+kmers <- read.table("../output/data tables/matching_analysis_bio_collinear/kmers (Summary).txt", sep="&") %>% mutate(method = "kmers", strobe_fraction = 0)
+
+mixedrandstrobes10 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedrandstrobe10 (Summary).txt", sep="&") %>% mutate(method = "randstrobes", strobe_fraction = 10)
+mixedrandstrobes20 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedrandstrobe20 (Summary).txt", sep="&") %>% mutate(method = "randstrobes", strobe_fraction = 20)
+mixedrandstrobes30 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedrandstrobe30 (Summary).txt", sep="&") %>% mutate(method = "randstrobes", strobe_fraction = 30)
+mixedrandstrobes40 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedrandstrobe40 (Summary).txt", sep="&") %>% mutate(method = "randstrobes", strobe_fraction = 40)
+mixedrandstrobes50 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedrandstrobe50 (Summary).txt", sep="&") %>% mutate(method = "randstrobes", strobe_fraction = 50)
+mixedrandstrobes60 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedrandstrobe60 (Summary).txt", sep="&") %>% mutate(method = "randstrobes", strobe_fraction = 60)
+mixedrandstrobes70 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedrandstrobe70 (Summary).txt", sep="&") %>% mutate(method = "randstrobes", strobe_fraction = 70)
+mixedrandstrobes80 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedrandstrobe80 (Summary).txt", sep="&") %>% mutate(method = "randstrobes", strobe_fraction = 80)
+mixedrandstrobes90 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedrandstrobe90 (Summary).txt", sep="&") %>% mutate(method = "randstrobes", strobe_fraction = 90)
+randstrobes <- read.table("../output/data tables/matching_analysis_bio_collinear/randstrobe (Summary).txt", sep="&") %>% mutate(method = "randstrobes", strobe_fraction = 100)
+
+mixedhybridstrobes10 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedhybridstrobe10 (Summary).txt", sep="&") %>% mutate(method = "hybridstrobes", strobe_fraction = 10)
+mixedhybridstrobes20 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedhybridstrobe20 (Summary).txt", sep="&") %>% mutate(method = "hybridstrobes", strobe_fraction = 20)
+mixedhybridstrobes30 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedhybridstrobe30 (Summary).txt", sep="&") %>% mutate(method = "hybridstrobes", strobe_fraction = 30)
+mixedhybridstrobes40 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedhybridstrobe40 (Summary).txt", sep="&") %>% mutate(method = "hybridstrobes", strobe_fraction = 40)
+mixedhybridstrobes50 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedhybridstrobe50 (Summary).txt", sep="&") %>% mutate(method = "hybridstrobes", strobe_fraction = 50)
+mixedhybridstrobes60 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedhybridstrobe60 (Summary).txt", sep="&") %>% mutate(method = "hybridstrobes", strobe_fraction = 60)
+mixedhybridstrobes70 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedhybridstrobe70 (Summary).txt", sep="&") %>% mutate(method = "hybridstrobes", strobe_fraction = 70)
+mixedhybridstrobes80 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedhybridstrobe80 (Summary).txt", sep="&") %>% mutate(method = "hybridstrobes", strobe_fraction = 80)
+mixedhybridstrobes90 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedhybridstrobe90 (Summary).txt", sep="&") %>% mutate(method = "hybridstrobes", strobe_fraction = 90)
+hybridstrobes <- read.table("../output/data tables/matching_analysis_bio_collinear/hybridstrobe (Summary).txt", sep="&") %>% mutate(method = "hybridstrobes", strobe_fraction = 100)
+
+mixedminstrobes10 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedminstrobe10 (Summary).txt", sep="&") %>% mutate(method = "minstrobes", strobe_fraction = 10)
+mixedminstrobes20 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedminstrobe20 (Summary).txt", sep="&") %>% mutate(method = "minstrobes", strobe_fraction = 20)
+mixedminstrobes30 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedminstrobe30 (Summary).txt", sep="&") %>% mutate(method = "minstrobes", strobe_fraction = 30)
+mixedminstrobes40 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedminstrobe40 (Summary).txt", sep="&") %>% mutate(method = "minstrobes", strobe_fraction = 40)
+mixedminstrobes50 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedminstrobe50 (Summary).txt", sep="&") %>% mutate(method = "minstrobes", strobe_fraction = 50)
+mixedminstrobes60 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedminstrobe60 (Summary).txt", sep="&") %>% mutate(method = "minstrobes", strobe_fraction = 60)
+mixedminstrobes70 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedminstrobe70 (Summary).txt", sep="&") %>% mutate(method = "minstrobes", strobe_fraction = 70)
+mixedminstrobes80 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedminstrobe80 (Summary).txt", sep="&") %>% mutate(method = "minstrobes", strobe_fraction = 80)
+mixedminstrobes90 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedminstrobe90 (Summary).txt", sep="&") %>% mutate(method = "minstrobes", strobe_fraction = 90)
+minstrobes <- read.table("../output/data tables/matching_analysis_bio_collinear/minstrobe (Summary).txt", sep="&") %>% mutate(method = "minstrobes", strobe_fraction = 100)
+
+mixedaltstrobes10 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedaltstrobe10 (Summary).txt", sep="&") %>% mutate(method = "altstrobes", strobe_fraction = 10) %>% mutate(V3 = V3*2)
+mixedaltstrobes20 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedaltstrobe20 (Summary).txt", sep="&") %>% mutate(method = "altstrobes", strobe_fraction = 20) %>% mutate(V3 = V3*2)
+mixedaltstrobes30 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedaltstrobe30 (Summary).txt", sep="&") %>% mutate(method = "altstrobes", strobe_fraction = 30) %>% mutate(V3 = V3*2)
+mixedaltstrobes40 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedaltstrobe40 (Summary).txt", sep="&") %>% mutate(method = "altstrobes", strobe_fraction = 40) %>% mutate(V3 = V3*2)
+mixedaltstrobes50 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedaltstrobe50 (Summary).txt", sep="&") %>% mutate(method = "altstrobes", strobe_fraction = 50) %>% mutate(V3 = V3*2)
+mixedaltstrobes60 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedaltstrobe60 (Summary).txt", sep="&") %>% mutate(method = "altstrobes", strobe_fraction = 60) %>% mutate(V3 = V3*2)
+mixedaltstrobes70 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedaltstrobe70 (Summary).txt", sep="&") %>% mutate(method = "altstrobes", strobe_fraction = 70) %>% mutate(V3 = V3*2)
+mixedaltstrobes80 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedaltstrobe80 (Summary).txt", sep="&") %>% mutate(method = "altstrobes", strobe_fraction = 80) %>% mutate(V3 = V3*2)
+mixedaltstrobes90 <- read.table("../output/data tables/matching_analysis_bio_collinear/mixedaltstrobe90 (Summary).txt", sep="&") %>% mutate(method = "altstrobes", strobe_fraction = 90)%>% mutate(V3 = V3*2)
+altstrobes <- read.table("../output/data tables/matching_analysis_bio_collinear/altstrobe (Summary).txt", sep="&") %>% mutate(method = "altstrobes", strobe_fraction = 100)%>% mutate(V3 = V3*2)
+
+results_coll <- rbind(
+  kmers, 
+  mixedhybridstrobes10, mixedhybridstrobes20, mixedhybridstrobes30, mixedhybridstrobes40, mixedhybridstrobes50, 
+  mixedhybridstrobes60, mixedhybridstrobes70, mixedhybridstrobes80, mixedhybridstrobes90, hybridstrobes,
+  mixedminstrobes10, mixedminstrobes20, mixedminstrobes30, mixedminstrobes40, mixedminstrobes50, 
+  mixedminstrobes60, mixedminstrobes70, mixedminstrobes80, mixedminstrobes90, minstrobes,
+  mixedrandstrobes10, mixedrandstrobes20, mixedrandstrobes30, mixedrandstrobes40, mixedrandstrobes50, 
+  mixedrandstrobes60, mixedrandstrobes70, mixedrandstrobes80, mixedrandstrobes90, randstrobes,
+  mixedaltstrobes10, mixedaltstrobes20, mixedaltstrobes30, mixedaltstrobes40, #mixedaltstrobes50, 
+  mixedaltstrobes60, mixedaltstrobes70, mixedaltstrobes80, mixedaltstrobes90, altstrobes
+  ) %>% rename("query" = "V1", "length" = "V2", "mp" = "V3", "sc" = "V4", "mc" = "V5", "esize" = "V6", "coll_esize" = "V7")
+
+results_coll$method <- factor(results_coll$method, levels = c("kmers", "minstrobes", "hybridstrobes", "randstrobes", "altstrobes", "spaced_kmers_dense", "spaced_kmers_sparse"))
+results_coll
+
+ggplot(results_coll %>% filter(strobe_fraction == 0 | strobe_fraction == 100), aes(x = length, y = mp, col = method))+
+  geom_point(size= 0.2, alpha = 0.2)+
+  geom_smooth(size = 0.6, se = F)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none")+
+  labs(x = "Length [bp]",
+       y = "Matches [%]")+
+  ylim(0, 15)
+ggsave("../output/figs/matching_analysis_bio/suppl_matches_(2,15,25,50).png", height = 3, width = 3)
+ggsave("../output/figs/matching_analysis_bio/suppl_matches_(2,15,25,50).pdf", height = 3, width = 3)
+
+ggplot(results_coll %>% filter(strobe_fraction == 0 | strobe_fraction == 100), aes(x = length, y = sc, col = method))+
+  geom_point(size= 0.2, alpha = 0.2)+
+  geom_smooth(size = 0.6, se = F)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none")+
+  labs(x = "Length [bp]",
+       y = "Sequence Coverage [%]")+
+  ylim(0, 100)
+ggsave("../output/figs/matching_analysis_bio/suppl_sequence_coverage_(2,15,25,50).png", height = 3, width = 3)
+ggsave("../output/figs/matching_analysis_bio/suppl_sequence_coverage_(2,15,25,50).pdf", height = 3, width = 3)
+
+ggplot(results_coll %>% filter(strobe_fraction == 0 | strobe_fraction == 100), aes(x = length, y = mc, col = method))+
+  geom_point(size= 0.2, alpha = 0.2)+
+  geom_smooth(size = 0.6, se = F)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none")+
+  labs(x = "Length [bp]",
+       y = "Match Coverage [%]")+
+  ylim(0, 100)
+ggsave("../output/figs/matching_analysis_bio/suppl_match_coverage_(2,15,25,50).png", height = 3, width = 3)
+ggsave("../output/figs/matching_analysis_bio/suppl_match_coverage_(2,15,25,50).pdf", height = 3, width = 3)
+
+ggplot(results_coll %>% filter(strobe_fraction == 0 | strobe_fraction == 100), aes(x = length, y = esize, col = method))+
+  geom_point(size= 0.2, alpha = 0.2)+
+  geom_smooth(size = 0.6, se = F)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none")+
+  labs(x = "Length [bp]",
+       y = "Expected Island Size [bp]")+
+  ylim(0, 1200)
+ggsave("../output/figs/matching_analysis_bio/suppl_expected_island_size_(2,15,25,50).png", height = 3, width = 3)
+ggsave("../output/figs/matching_analysis_bio/suppl_expected_island_size_(2,15,25,50).pdf", height = 3, width = 3)
+
+
+results_coll_rand_alt <- rbind(mixedrandstrobes80 %>% mutate(method = "mixedrandstrobes80"), randstrobes, altstrobes)%>% rename("query" = "V1", "length" = "V2", "mp" = "V3", "sc" = "V4", "mc" = "V5", "esize" = "V6", "coll_esize" = "V7")
+results_coll_rand_alt$method <- factor(results_coll_rand_alt$method, levels =c("mixedrandstrobes80", "randstrobes", "altstrobes"))
+
+ggplot(results_coll_rand_alt, aes(x = length, y = mp, col = method))+
+  geom_point(size= 0.2, alpha = 0.2)+
+  geom_smooth(size = 0.4, se = F)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none")+
+  scale_color_manual(values = c("blue", "#00B0F6", "#E76BF3"))+
+  scale_linetype_manual(values = c("dotted", "solid", "solid"))+ 
+  labs(x = "Length [bp]",
+       y = "Matches [%]")
+ggsave("../output/figs/matching_analysis_bio/suppl_matches_detail_(2,15,25,50).png", height = 3, width = 3)
+ggsave("../output/figs/matching_analysis_bio/suppl_matches_detail_(2,15,25,50).pdf", height = 3, width = 3)
+
+ggplot(results_coll_rand_alt, aes(x = length, y = sc, col = method))+
+  geom_point(size= 0.2, alpha = 0.2)+
+  geom_smooth(size = 0.4, se = F)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none")+
+  scale_color_manual(values = c("blue", "#00B0F6", "#E76BF3"))+
+  scale_linetype_manual(values = c("dotted", "solid", "solid"))+ 
+  labs(x = "Length [bp]",
+       y = "Sequence Coverage [%]")
+ggsave("../output/figs/matching_analysis_bio/suppl_sequence_coverage_detail_(2,15,25,50).png", height = 3, width = 3)
+ggsave("../output/figs/matching_analysis_bio/suppl_sequence_coverage_detail_(2,15,25,50).pdf", height = 3, width = 3)
+
+ggplot(results_coll_rand_alt, aes(x = length, y = mc, col = method))+
+  geom_point(size= 0.2, alpha = 0.2)+
+  geom_smooth(size = 0.4, se = F)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none")+
+  scale_color_manual(values = c("blue", "#00B0F6", "#E76BF3"))+
+  scale_linetype_manual(values = c("dotted", "solid", "solid"))+ 
+  labs(x = "Length [bp]",
+       y = "Match Coverage [%]")
+ggsave("../output/figs/matching_analysis_bio/suppl_match_coverage_detail_(2,15,25,50).png", height = 3, width = 3)
+ggsave("../output/figs/matching_analysis_bio/suppl_match_coverage_detail_(2,15,25,50).pdf", height = 3, width = 3)
+
+ggplot(results_coll_rand_alt, aes(x = length, y = esize, col = method))+
+  geom_point(size= 0.2, alpha = 0.2)+
+  geom_smooth(size = 0.4, se = F)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none")+
+  scale_color_manual(values = c("blue", "#00B0F6", "#E76BF3"))+
+  scale_linetype_manual(values = c("dotted", "solid", "solid"))+
+  scale_y_log10()+
+  labs(x = "Length [bp]",
+       y = "Expected Island Size [bp]")
+ggsave("../output/figs/matching_analysis_bio/suppl_expected_island_size_detail_(2,15,25,50).png", height = 3, width = 3)
+ggsave("../output/figs/matching_analysis_bio/suppl_expected_island_size_detail_(2,15,25,50).pdf", height = 3, width = 3)
+
+
+results_coll_comparison <- left_join(randstrobes, mixedrandstrobes80, by = c("V1", "V2")) %>% 
+  left_join(altstrobes, by = c("V1", "V2")) %>% 
+  mutate(mp_mixed = V3.y/V3.x, mp_alt = V3/V3.x, 
+         sc_mixed = V4.y/V4.x, sc_alt = V4/V4.x, 
+         mc_mixed = V5.y/V5.x, mc_alt = V5/V5.x,
+         esize_mixed = V6.y/V6.x, esize_alt = V6/V6.x) %>% 
+  dplyr::select("length"=V2,mp_mixed, mp_alt, sc_mixed, sc_alt, mc_mixed, mc_alt, esize_mixed, esize_alt)
+
+
+ggplot(results_coll_comparison)+
+  geom_point(aes(x = length, y = mp_mixed), col = "blue", size= 0.2, alpha = 0.2)+
+  geom_smooth(aes(x = length, y = mp_mixed), col = "blue", size = 0.4, se = F)+
+  geom_point(aes(x = length, y = mp_alt), col = "#E76BF3", size= 0.2, alpha = 0.2)+
+  geom_smooth(aes(x = length, y = mp_alt), col = "#E76BF3", size = 0.4, se = F)+
+  geom_line(aes(x=length, y = 1), col = "#00B0F6")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        legend.position = "none")+
+  #scale_y_continuous(trans = log2_trans(), breaks = c(0.9, 1.0, 1.1, 1.2, 1.3, 1.4))+
+  labs(x = "Length [bp]",
+       y = "Matches [normalized by randstrobes]")
+ggsave("../output/figs/matching_analysis_bio/additional_matches_detail_normalized_(2,15,25,50).png", height = 3, width = 3)
+ggsave("../output/figs/matching_analysis_bio/additional_matches_detail_normalized_(2,15,25,50).pdf", height = 3, width = 3)
+
+ggplot(results_coll_comparison)+
+  geom_point(aes(x = length, y = sc_mixed), col = "blue", size= 0.2, alpha = 0.2)+
+  geom_smooth(aes(x = length, y = sc_mixed), col = "blue", size = 0.4, se = F)+
+  geom_point(aes(x = length, y = sc_alt), col = "#E76BF3", size= 0.2, alpha = 0.2)+
+  geom_smooth(aes(x = length, y = sc_alt), col = "#E76BF3", size = 0.4, se = F)+
+  geom_line(aes(x=length, y = 1), col = "#00B0F6")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        legend.position = "none")+
+  #scale_y_continuous(trans = log2_trans(), breaks = c(0.9, 1.0, 1.1, 1.2, 1.3, 1.4))+
+  labs(x = "Length [bp]",
+       y = "Sequence Coverage [normalized by randstrobes]")
+ggsave("../output/figs/matching_analysis_bio/additional_sequence_coverage_detail_normalized_(2,15,25,50).png", height = 3, width = 3)
+ggsave("../output/figs/matching_analysis_bio/additional_sequence_coverage_detail_normalized_(2,15,25,50).pdf", height = 3, width = 3)
+
+ggplot(results_coll_comparison)+
+  geom_point(aes(x = length, y = mc_mixed), col = "blue", size= 0.2, alpha = 0.2)+
+  geom_smooth(aes(x = length, y = mc_mixed), col = "blue", size = 0.4, se = F)+
+  geom_point(aes(x = length, y = mc_alt), col = "#E76BF3", size= 0.2, alpha = 0.2)+
+  geom_smooth(aes(x = length, y = mc_alt), col = "#E76BF3", size = 0.4, se = F)+
+  geom_line(aes(x=length, y = 1), col = "#00B0F6")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        legend.position = "none")+
+  #scale_y_continuous(trans = log2_trans(), breaks = c(0.8, 0.9, 1.0, 1.1, 1.2))+
+  labs(x = "Length [bp]",
+       y = "Match Coverage [normalized by randstrobes]")
+ggsave("../output/figs/matching_analysis_bio/additional_match_coverage_detail_normalized_(2,15,25,50).png", height = 3, width = 3)
+ggsave("../output/figs/matching_analysis_bio/additional_match_coverage_detail_normalized_(2,15,25,50).pdf", height = 3, width = 3)
+
+ggplot(results_coll_comparison)+
+  geom_point(aes(x = length, y = esize_mixed), col = "blue", size= 0.2, alpha = 0.2)+
+  geom_smooth(aes(x = length, y = esize_mixed), col = "blue", size = 0.4, se = F)+
+  geom_point(aes(x = length, y = esize_alt), col = "#E76BF3", size= 0.2, alpha = 0.2)+
+  geom_smooth(aes(x = length, y = esize_alt), col = "#E76BF3", size = 0.4, se = F)+
+  geom_line(aes(x=length, y = 1), col = "#00B0F6")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), 
+        legend.position = "none")+
+  #scale_y_continuous(trans = log2_trans(), breaks = c(0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2))+
+  labs(x = "Length [bp]",
+       y = "Expected Island Size [normalized by randstrobes]")
+ggsave("../output/figs/matching_analysis_bio/additional_expected_island_size_detail_normalized_(2,15,25,50).png", height = 3, width = 3)
+ggsave("../output/figs/matching_analysis_bio/additional_expected_island_size_detail_normalized_(2,15,25,50).pdf", height = 3, width = 3)
+
+
+n_protocol <- results_coll %>% group_by(method, strobe_fraction) %>% summarise(tot_length = sum(length))
+
+results_coll_summarized <- results_coll %>% 
+  mutate(mp = mp * length, sc = sc * length, mc = mc * length, esize = esize * length) %>% 
+  group_by(method, strobe_fraction) %>% summarise(length = mean(length), mp = sum(mp), sc = sum(sc), mc = sum(mc), esize = sum(esize)) %>% 
+  left_join(n_protocol, by=c("method", "strobe_fraction")) %>% 
+  mutate(mp = mp/tot_length, sc = sc/tot_length, mc = mc/tot_length, esize = esize/tot_length)
+results_coll_summarized$method <- factor(results_coll_summarized$method, levels = c("kmers", "minstrobes", "hybridstrobes", "randstrobes", "altstrobes", "spaced_kmers_dense", "spaced_kmers_sparse"))
+
+results_coll_summarized %>% filter(strobe_fraction == 0 | strobe_fraction == 100)
+results_coll_summarized %>% filter(method == "randstrobes")
+
+p <- ggplot(results_coll_summarized)+
+  geom_point(aes(x = strobe_fraction, y = mp, col = method, shape = method))+
+  geom_line(aes(x = strobe_fraction, y = mp, col = method))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none")+
+  scale_shape_manual(values = c(16,22,23,24,25))+
+  labs(x = "Strobe Fraction [%]",
+       y = "Matches [%]")
+ggsave("../output/figs/matching_analysis_bio/fig_3a_matches_(2,15,25,50).png", height = 3, width = 3)
+ggsave("../output/figs/matching_analysis_bio/fig_3a_matches_(2,15,25,50).pdf", height = 3, width = 3)
+
+p <- ggplot(results_coll_summarized)+
+  geom_point(aes(x = strobe_fraction, y = sc, col = method, shape = method))+
+  geom_line(aes(x = strobe_fraction, y = sc, col = method))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none")+
+  scale_shape_manual(values = c(16,22,23,24,25))+
+  labs(x = "Strobe Fraction [%]",
+       y = "Sequence Coverage [%]")
+ggsave("../output/figs/matching_analysis_bio/fig_3b_sequence_coverage_(2,15,25,50).png", height = 3, width = 3)
+ggsave("../output/figs/matching_analysis_bio/fig_3b_sequence_coverage_(2,15,25,50).pdf", height = 3, width = 3)
+
+p <- ggplot(results_coll_summarized)+
+  geom_point(aes(x = strobe_fraction, y = mc, col = method, shape = method))+
+  geom_line(aes(x = strobe_fraction, y = mc, col = method))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none")+
+  scale_shape_manual(values = c(16,22,23,24,25))+
+  labs(x = "Strobe Fraction [%]",
+       y = "Match Coverage [%]")
+ggsave("../output/figs/matching_analysis_bio/fig_3c_match_coverage_(2,15,25,50).png", height = 3, width = 3)
+ggsave("../output/figs/matching_analysis_bio/fig_3c_match_coverage_(2,15,25,50).pdf", height = 3, width = 3)
+
+p <- ggplot(results_coll_summarized)+
+  geom_point(aes(x = strobe_fraction, y = esize, col = method, shape = method))+
+  geom_line(aes(x = strobe_fraction, y = esize, col = method))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none")+
+  scale_shape_manual(values = c(16,22,23,24,25))+
+  labs(x = "Strobe Fraction [%]",
+       y = "Expected Island Size")
+ggsave("../output/figs/matching_analysis_bio/fig_3d_expected_island_size_(2,15,25,50).png", height = 3, width = 3)
+ggsave("../output/figs/matching_analysis_bio/fig_3d_expected_island_size_(2,15,25,50).pdf", height = 3, width = 3)
+```
+
+
+```{r Code for Fig. 4}
+results_esize <- read.table(file = "../output/data tables/esize", header = TRUE, sep = ",")
+results_esize
+results_esize$datastructure = factor(results_esize$datastructure, levels=c('kmers', 'randstrobes', 'mixedrandstrobes', 'altstrobes'))
+
+ggplot(results_esize)+
+  geom_line(aes(x = k, y = ehits, col = datastructure, linetype = datastructure))+
+  geom_point(aes(x = k, y = ehits, col = datastructure, shape = datastructure))+
+  scale_linetype_manual(values=c("solid", "longdash", "longdash", "longdash"))+
+  scale_shape_manual(values = c(16,24,24,25))+
+  scale_color_manual(values = c("#F8766D", "#00B0F6", "blue", "#E76BF3"))+
+  theme(legend.position = "none")+
+  ylab("E-hits")+
+  scale_x_continuous(limits = c(18, 36))+
+  scale_y_log10(breaks = c(10,20,30,40,50)) 
+
+ggsave("../output/figs/uniqueness_esize/fig_4_ehits.png", width = 6, height = 4.4)
+ggsave("../output/figs/uniqueness_esize/fig_4_ehits.pdf", width = 6, height = 4.4)
+```
+
+```{r Code for Suppl. Fig. S2}
+altstrobes_uniqueness <- read.table("../output/data tables/altstrobes10000_uniqueness", sep = ";", header = F) %>% 
+  mutate(V1 = ifelse(V1 == "altstrobes2", "altstrobes", V1),
+         V1 = ifelse(V1 == "randstrobes2", "randstrobes", V1)) %>% dplyr::rename("seeding" = "V1")
+altstrobes_uniqueness$V2 <- factor(altstrobes_uniqueness$V2, levels = altstrobes_uniqueness$V2)
+
+ggplot(altstrobes_uniqueness, aes(x=V2, y=V3, group=1))+
+  geom_point(aes(col = seeding), stat='summary', fun.y=sum, size = 2.5)+
+  stat_summary(aes(col = seeding), fun.y=sum, geom="line")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "bottom")+
+  scale_color_manual(values = c("#E76BF3", "#F8766D", "#00B0F6"))+
+  xlab("k")+
+  ylab("% unique")+
+  ylim(0,100)
+ggsave("../output/figs/uniqueness_esize/suppl_altstrobe_uniqueness.png", width = 5, height = 5)
+ggsave("../output/figs/uniqueness_esize/suppl_altstrobe_uniqueness.pdf", width = 5, height = 5)
+```
+
+
+```{r Code for Suppl. Fig. S3}
+altstrobes_raw_data <- read.table(file = "../output/data tables/altstrobes", sep = "&", header = F)
+altstrobes_raw_data
+
+results_sim_alt <- altstrobes_raw_data %>% group_by(V1, V2, V7) %>% summarise(m = round(mean(V3),2), sc = round(mean(V4),2), mc = round(mean(V5),2), esize = round(mean(V6),2))
+results_sim_alt
+
+colnames(results_sim_alt) <- c("protocol", "strobe_lengths", "mutation_rate", "matches", "sequence_coverage", "match_coverage", "gaps")
+results_sim_alt$strobe_lengths <- factor(results_sim_alt$strobe_lengths, levels = c(" (1/29) ", " (2/28) ", " (3/27) ", " (4/26) ", " (5/25) ", " (6/24) ", " (7/23) ", " (8/22) ", " (9/21) ", " (10/20) ", " (11/19) ", " (12/18) ", " (13/17) ", " (14/16) ", " (15/15) "))
+results_sim_alt <- results_sim_alt %>% mutate(protocol = ifelse(strobe_lengths == " (15/15) ", "randstrobes", protocol))
+
+p <- ggplot(results_sim_alt, aes(x = strobe_lengths, y = matches, group=1))+
+  geom_point(aes(col = protocol))+
+  geom_line()+
+  stat_summary(geom = "line", col = "#E76BF3")+
+  scale_color_manual(values = c("#E76BF3", "#00B0F6"))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  theme(legend.position = "none")+
+  labs(x = "Strobe Length",
+       y = "Matches [%]")+
+  facet_wrap(~mutation_rate, scales = "free")
+
+ggsave("../output/figs/matching_analysis_sim/suppl_matches_altstrobes.png", height = 3, width = 7)
+ggsave("../output/figs/matching_analysis_sim/suppl_matches_altstrobes.pdf", height = 3, width = 7)
+
+p <- ggplot(results_sim_alt, aes(x = strobe_lengths, y = sequence_coverage, group=1))+
+  geom_point(aes(col = protocol))+
+  geom_line()+
+  stat_summary(geom = "line", col = "#E76BF3")+
+  scale_color_manual(values = c("#E76BF3", "#00B0F6"))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  theme(legend.position = "none")+
+  labs(x = "Strobe Length",
+       y = "Sequence Coverage [%]")+
+  facet_wrap(~mutation_rate, scales = "free")
+
+ggsave("../output/figs/matching_analysis_sim/suppl_sequence_coverage_altstrobes.png", height = 3, width = 7)
+ggsave("../output/figs/matching_analysis_sim/suppl_sequence_coverage_altstrobes.pdf", height = 3, width = 7)
+
+p <- ggplot(results_sim_alt, aes(x = strobe_lengths, y = match_coverage, group=1))+
+  geom_point(aes(col = protocol))+
+  geom_line()+
+  stat_summary(geom = "line", col = "#E76BF3")+
+  scale_color_manual(values = c("#E76BF3", "#00B0F6"))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  theme(legend.position = "none")+
+  labs(x = "Strobe Length",
+       y = "Match Coverage [%]")+
+  facet_wrap(~mutation_rate, scales = "free")
+
+ggsave("../output/figs/matching_analysis_sim/suppl_match_coverage_altstrobes.png", height = 3, width = 7)
+ggsave("../output/figs/matching_analysis_sim/suppl_match_coverage_altstrobes.pdf", height = 3, width = 7)
+
+p <- ggplot(results_sim_alt, aes(x = strobe_lengths, y = gaps, group=1))+
+  geom_point(aes(col = protocol))+
+  geom_line()+
+  stat_summary(geom = "line", col = "#E76BF3")+
+  scale_color_manual(values = c("#E76BF3", "#00B0F6"))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  theme(legend.position = "none")+
+  labs(x = "Strobe Length",
+       y = "Expected Island Size [bp]")+
+  facet_wrap(~mutation_rate, scales = "free")
+
+ggsave("../output/figs/matching_analysis_sim/suppl_expected_island_size_altstrobes.png", height = 3, width = 7)
+ggsave("../output/figs/matching_analysis_sim/suppl_expected_island_size_altstrobes.pdf", height = 3, width = 7)
+```
+
+```{r Code for Suppl. Fig. S4}
+results_sim <- read.table(file = "../output/data tables/matching_analysis_simulated (2,15,25,50)", sep = "&", header = F)
+colnames(results_sim) <- c("protocol", "order", "setting", "strobe_fraction", "matches", "sequence_coverage", "match_coverage", "gaps", "mutation_rate")
+results_sim <- results_sim %>% mutate(protocol = gsub("mixed", "", protocol))
+results_sim <- results_sim %>% group_by(protocol, order, strobe_fraction, mutation_rate) %>% 
+  summarise(matches = mean(matches), sequence_coverage = mean(sequence_coverage), match_coverage = mean(match_coverage), gaps = mean(gaps))
+results_sim$protocol <- factor(results_sim$protocol, levels = c("kmers", "minstrobes", "hybridstrobes", "randstrobes", "altstrobes", "spaced_kmers_dense", "spaced_kmers_sparse"))
+results_sim <- results_sim %>% filter(protocol != "altstrobes" | strobe_fraction != 0.5)
+results_sim
+
+p <- ggplot(results_sim %>% filter(!protocol %in% c("spaced_kmers_dense", "spaced_kmers_sparse")))+
+  geom_point(aes(x = 100*strobe_fraction, y = matches, col = protocol, shape = protocol))+
+  geom_line(aes(x = 100*strobe_fraction, y = matches, col = protocol))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none")+
+  scale_shape_manual(values = c(16,22,23,24,25))+
+  labs(x = "Strobe Fraction [%]",
+       y = "Matches [%]")+
+  facet_grid(mutation_rate~order, scales = "free")
+p +
+  scale_x_continuous(sec.axis = sec_axis(~ . , name = "Order", breaks = NULL, labels = NULL)) +
+  scale_y_continuous(sec.axis = sec_axis(~ . , name = "Mutation Rate", breaks = NULL, labels = NULL))
+
+ggsave("../output/figs/matching_analysis_sim/supp_matches_sim_all_(2,15,25,50).png", height = 7, width = 8)
+ggsave("../output/figs/matching_analysis_sim/supp_matches_sim_all_(2,15,25,50).pdf", height = 7, width = 8)
+
+p <- ggplot(results_sim %>% filter(!protocol %in% c("spaced_kmers_dense", "spaced_kmers_sparse")) )+
+  geom_point(aes(x = 100*strobe_fraction, y = sequence_coverage, col = protocol, shape = protocol))+
+  geom_line(aes(x = 100*strobe_fraction, y = sequence_coverage, col = protocol))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none")+
+  scale_shape_manual(values = c(16,22,23,24,25))+
+  labs(x = "Strobe Fraction [%]",
+       y = "Sequence Coverage [%]")+
+  facet_grid(mutation_rate~order, scales = "free")
+p +
+  scale_x_continuous(sec.axis = sec_axis(~ . , name = "Order", breaks = NULL, labels = NULL)) +
+  scale_y_continuous(sec.axis = sec_axis(~ . , name = "Mutation Rate", breaks = NULL, labels = NULL))
+ggsave("../output/figs/matching_analysis_sim/supp_sequence_coverage_sim_all_(2,15,25,50).png", height = 7, width = 8)
+ggsave("../output/figs/matching_analysis_sim/supp_sequence_coverage_sim_all_(2,15,25,50).pdf", height = 7, width = 8)
+
+p <- ggplot(results_sim %>% filter(!protocol %in% c("spaced_kmers_dense", "spaced_kmers_sparse")) )+
+  geom_point(aes(x = 100*strobe_fraction, y = match_coverage, col = protocol, shape = protocol))+
+  geom_line(aes(x = 100*strobe_fraction, y = match_coverage, col = protocol))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none")+
+  scale_shape_manual(values = c(16,22,23,24,25))+
+  labs(x = "Strobe Fraction [%]",
+       y = "Match Coverage [%]")+
+  facet_grid(mutation_rate~order, scales = "free")
+p +
+  scale_x_continuous(sec.axis = sec_axis(~ . , name = "Order", breaks = NULL, labels = NULL)) +
+  scale_y_continuous(sec.axis = sec_axis(~ . , name = "Mutation Rate", breaks = NULL, labels = NULL))
+ggsave("../output/figs/matching_analysis_sim/supp_match_coverage_sim_all_(2,15,25,50).png", height = 7, width = 8)
+ggsave("../output/figs/matching_analysis_sim/supp_match_coverage_sim_all_(2,15,25,50).pdf", height = 7, width = 8)
+
+p <- ggplot(results_sim %>% filter(!protocol %in% c("spaced_kmers_dense", "spaced_kmers_sparse")) )+
+  geom_point(aes(x = 100*strobe_fraction, y = gaps, col = protocol, shape = protocol))+
+  geom_line(aes(x = 100*strobe_fraction, y = gaps, col = protocol))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        legend.position = "none")+
+  scale_shape_manual(values = c(16,22,23,24,25))+
+  labs(x = "Strobe Fraction [%]",
+       y = "Expected Island Size [bp]")+
+  facet_grid(mutation_rate~order, scales = "free")
+p +
+  scale_x_continuous(sec.axis = sec_axis(~ . , name = "Order", breaks = NULL, labels = NULL)) +
+  scale_y_continuous(sec.axis = sec_axis(~ . , name = "Mutation Rate", breaks = NULL, labels = NULL))
+ggsave("../output/figs/matching_analysis_sim/supp_expected_island_size_sim_all_(2,15,25,50).png", height = 7, width = 8)
+ggsave("../output/figs/matching_analysis_sim/supp_expected_island_size_sim_all_(2,15,25,50).pdf", height = 7, width = 8)
+
+
+p <- ggplot(results_sim %>% filter(!protocol %in% c("spaced_kmers_dense", "spaced_kmers_sparse")) %>% filter(order == 2) )+
+  geom_point(aes(x = 100*strobe_fraction, y = matches, col = protocol, shape = protocol))+
+  geom_line(aes(x = 100*strobe_fraction, y = matches, col = protocol))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  theme(legend.position = "none")+
+  scale_shape_manual(values = c(16,22,23,24,25))+
+  labs(x = "Strobe Fraction [%]",
+       y = "Matches [%]")+
+  facet_wrap(~mutation_rate, scales = "free")
+p +
+  scale_x_continuous(sec.axis = sec_axis(~ . , name = "Mutation Rate", breaks = NULL, labels = NULL))
+
+ggsave("../output/figs/matching_analysis_sim/additional_matches_order2_(2,15,25,50).png", height = 3, width = 7)
+ggsave("../output/figs/matching_analysis_sim/additional_matches_order2_(2,15,25,50).pdf", height = 3, width = 7)
+
+p <- ggplot(results_sim %>% filter(!protocol %in% c("spaced_kmers_dense", "spaced_kmers_sparse")) %>% filter(order == 2) )+
+  geom_point(aes(x = 100*strobe_fraction, y = sequence_coverage, col = protocol, shape = protocol))+
+  geom_line(aes(x = 100*strobe_fraction, y = sequence_coverage, col = protocol))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  theme(legend.position = "none")+
+  scale_shape_manual(values = c(16,22,23,24,25))+
+  labs(x = "Strobe Fraction [%]",
+       y = "Sequence Coverage [%]")+
+  facet_wrap(~mutation_rate, scales = "free")
+p +
+  scale_x_continuous(sec.axis = sec_axis(~ . , name = "Mutation Rate", breaks = NULL, labels = NULL))
+ggsave("../output/figs/matching_analysis_sim/additional_sequence_coverage_order2_(2,15,25,50).png", height = 3, width = 7)
+ggsave("../output/figs/matching_analysis_sim/additional_sequence_coverage_order2_(2,15,25,50).pdf", height = 3, width = 7)
+
+p <- ggplot(results_sim %>% filter(!protocol %in% c("spaced_kmers_dense", "spaced_kmers_sparse")) %>% filter(order == 2) )+
+  geom_point(aes(x = 100*strobe_fraction, y = match_coverage, col = protocol, shape = protocol))+
+  geom_line(aes(x = 100*strobe_fraction, y = match_coverage, col = protocol))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  theme(legend.position = "none")+
+  scale_shape_manual(values = c(16,22,23,24,25))+
+  labs(x = "Strobe Fraction [%]",
+       y = "Match Coverage [%]")+
+  facet_wrap(~mutation_rate, scales = "free")
+p +
+  scale_x_continuous(sec.axis = sec_axis(~ . , name = "Mutation Rate", breaks = NULL, labels = NULL))
+ggsave("../output/figs/matching_analysis_sim/additional_match_coverage_order2_(2,15,25,50).png", height = 3, width = 7)
+ggsave("../output/figs/matching_analysis_sim/additional_match_coverage_order2_(2,15,25,50).pdf", height = 3, width = 7)
+
+p <- ggplot(results_sim %>% filter(!protocol %in% c("spaced_kmers_dense", "spaced_kmers_sparse")) %>% filter(order == 2) )+
+  geom_point(aes(x = 100*strobe_fraction, y = gaps, col = protocol, shape = protocol))+
+  geom_line(aes(x = 100*strobe_fraction, y = gaps, col = protocol))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  theme(legend.position = "none")+
+  scale_shape_manual(values = c(16,22,23,24,25))+
+  labs(x = "Strobe Fraction [%]",
+       y = "Expected Island Size [bp]")+
+  facet_wrap(~mutation_rate, scales = "free")
+p +
+  scale_x_continuous(sec.axis = sec_axis(~ . , name = "Mutation Rate", breaks = NULL, labels = NULL))
+ggsave("../output/figs/matching_analysis_sim/additional_expected_island_size_order2_(2,15,25,50).pdf", height = 3, width = 7)
+ggsave("../output/figs/matching_analysis_sim/additional_expected_island_size_order2_(2,15,25,50).png", height = 3, width = 7)
+
+
+
+results_sim <- read.table(file = "../output/data tables/matching_analysis_simulated_(2,15,16,50)", sep = "&", header = F)
+colnames(results_sim) <- c("protocol", "order", "setting", "strobe_fraction", "matches", "sequence_coverage", "match_coverage", "gaps", "mutation_rate")
+results_sim <- results_sim %>% mutate(protocol = gsub("mixed", "", protocol))
+results_sim$protocol <- factor(results_sim$protocol, levels = c("kmers", "minstrobes", "hybridstrobes", "randstrobes", "altstrobes", "spaced_kmers_dense", "spaced_kmers_sparse"))
+results_sim <- results_sim %>% filter(protocol != "altstrobes" | strobe_fraction != 0.5)
+
+p <- ggplot(results_sim %>% filter(!protocol %in% c("spaced_kmers_dense", "spaced_kmers_sparse")) %>% filter(order == 2) )+
+  geom_point(aes(x = 100*strobe_fraction, y = matches, col = protocol, shape = protocol))+
+  geom_line(aes(x = 100*strobe_fraction, y = matches, col = protocol))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  theme(legend.position = "none")+
+  scale_shape_manual(values = c(16,22,23,24,25))+
+  labs(x = "Strobe Fraction [%]",
+       y = "Matches [%]")+
+  facet_wrap(~mutation_rate, scales = "free")
+p +
+  scale_x_continuous(sec.axis = sec_axis(~ . , name = "Mutation Rate", breaks = NULL, labels = NULL))
+
+ggsave("../output/figs/matching_analysis_sim/additional_matches_order2_(2,15,16,50).png", height = 3, width = 7)
+ggsave("../output/figs/matching_analysis_sim/additional_matches_order2_(2,15,16,50).pdf", height = 3, width = 7)
+
+p <- ggplot(results_sim %>% filter(!protocol %in% c("spaced_kmers_dense", "spaced_kmers_sparse")) %>% filter(order == 2) )+
+  geom_point(aes(x = 100*strobe_fraction, y = sequence_coverage, col = protocol, shape = protocol))+
+  geom_line(aes(x = 100*strobe_fraction, y = sequence_coverage, col = protocol))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  theme(legend.position = "none")+
+  scale_shape_manual(values = c(16,22,23,24,25))+
+  labs(x = "Strobe Fraction [%]",
+       y = "Sequence Coverage [%]")+
+  facet_wrap(~mutation_rate, scales = "free")
+p +
+  scale_x_continuous(sec.axis = sec_axis(~ . , name = "Mutation Rate", breaks = NULL, labels = NULL))
+ggsave("../output/figs/matching_analysis_sim/additional_sequence_coverage_order2_(2,15,16,50).png", height = 3, width = 7)
+ggsave("../output/figs/matching_analysis_sim/additional_sequence_coverage_order2_(2,15,16,50).pdf", height = 3, width = 7)
+
+p <- ggplot(results_sim %>% filter(!protocol %in% c("spaced_kmers_dense", "spaced_kmers_sparse")) %>% filter(order == 2) )+
+  geom_point(aes(x = 100*strobe_fraction, y = match_coverage, col = protocol, shape = protocol))+
+  geom_line(aes(x = 100*strobe_fraction, y = match_coverage, col = protocol))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  theme(legend.position = "none")+
+  scale_shape_manual(values = c(16,22,23,24,25))+
+  labs(x = "Strobe Fraction [%]",
+       y = "Match Coverage [%]")+
+  facet_wrap(~mutation_rate, scales = "free")
+p +
+  scale_x_continuous(sec.axis = sec_axis(~ . , name = "Mutation Rate", breaks = NULL, labels = NULL))
+ggsave("../output/figs/matching_analysis_sim/additional_match_coverage_order2_(2,15,16,50).png", height = 3, width = 7)
+ggsave("../output/figs/matching_analysis_sim/additional_match_coverage_order2_(2,15,16,50).pdf", height = 3, width = 7)
+
+p <- ggplot(results_sim %>% filter(!protocol %in% c("spaced_kmers_dense", "spaced_kmers_sparse")) %>% filter(order == 2) )+
+  geom_point(aes(x = 100*strobe_fraction, y = gaps, col = protocol, shape = protocol))+
+  geom_line(aes(x = 100*strobe_fraction, y = gaps, col = protocol))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  theme(legend.position = "none")+
+  scale_shape_manual(values = c(16,22,23,24,25))+
+  labs(x = "Strobe Fraction [%]",
+       y = "Expected Island Size [bp]")+
+  facet_wrap(~mutation_rate, scales = "free")
+p +
+  scale_x_continuous(sec.axis = sec_axis(~ . , name = "Mutation Rate", breaks = NULL, labels = NULL))
+ggsave("../output/figs/matching_analysis_sim/additional_expected_island_size_order2_(2,15,16,50).pdf", height = 3, width = 7)
+ggsave("../output/figs/matching_analysis_sim/additional_expected_island_size_order2_(2,15,16,50).png", height = 3, width = 7)
+```
+
+
+
+```{r Code for Suppl. Fig. S7}
+results_uniqueness <- read.table(file = "../output/data tables/uniqueness.csv", header = TRUE, sep = ",")
+results_uniqueness
+results_uniqueness$Method = factor(results_uniqueness$Method, levels=c('kmers', 'mixedminstrobes2', 'mixedminstrobes3', 'mixedhybridstrobes2', 'mixedhybridstrobes3', 'mixedrandstrobes2', 'mixedrandstrobes3', 'mixedaltstrobes2'))
+
+ggplot(results_uniqueness %>% filter(Method != "kmers"))+
+  geom_line(aes(x = k, y = unique, group= strobefraction, col = strobefraction))+
+  facet_wrap(~ Method)+
+  scale_color_viridis(discrete = FALSE, option = "B")+
+  ylab("% unique")+
+  scale_x_continuous(limits = c(18, 36))
+
+ggsave("../output/figs/uniqueness_esize/suppl_uniqueness_mixed.png", width = 5, height = 5)
+ggsave("../output/figs/uniqueness_esize/suppl_uniqueness_mixed.pdf", width = 5, height = 5)
+
+results_uniqueness2 <- results_uniqueness %>% filter(Method == "kmers" | strobefraction == 100) %>% mutate(Method = str_replace(Method, "mixed",""))
+results_uniqueness2$Method = factor(results_uniqueness2$Method, levels=c('kmers', 'minstrobes2', 'minstrobes3', 'hybridstrobes2', 'hybridstrobes3', 'randstrobes2', 'randstrobes3', 'altstrobes2'))                                                                                                           
+
+ggplot(results_uniqueness2)+
+  geom_line(aes(x = k, y = unique, col = Method, linetype = Method))+
+  geom_point(aes(x = k, y = unique, col = Method, shape = Method))+
+  theme(legend.position = "bottom")+
+  scale_linetype_manual(values=c("solid", "longdash", "dotted", "longdash", "dotted", "longdash", "dotted", "longdash"))+
+  scale_shape_manual(values = c(16,22,22,23,23,24,24,25))+
+  ylab("% unique")+
+  scale_x_continuous(limits = c(18, 36))
+
+ggsave("../output/figs/uniqueness_esize/suppl_uniqueness_overview.png", width = 6, height = 6)
+ggsave("../output/figs/uniqueness_esize/suppl_uniqueness_overview.pdf", width = 6, height = 6)
+```
+
+
+```{r Code for Suppl. Fig. S8}
+results_benchmarking_strobemap <- read.table("../output/data tables/benchmark_strobemap_indexing", header=T, sep="&", dec = ".", check.names = FALSE)
+plotted_variables <- c("Total indexing time [s]", "Total time generating mers [s]", "Total size of hash table index [Mb]")
+
+results_benchmarking_strobemap$seeding <- factor(results_benchmarking_strobemap$seeding, levels = c("k-mers", "randstrobes", "mixedstrobes", "altstrobes"))
+results_benchmarking_strobemap_melted <- reshape2::melt(results_benchmarking_strobemap, id = c("setting", "genome", "seeding"))
+results_benchmarking_strobemap_melted$variable <- factor(results_benchmarking_strobemap_melted$variable, 
+                                                         levels=c(
+                                                          "Total indexing time [s]",
+                                                          "Total time generating mers [s]",
+                                                          "Total time generating flat index vector [s]",
+                                                          "Total time generating hash table [s]",
+                                                          "Maximum resident set size [Mb]",
+                                                          "Total size of flat mers-vector [Mb]",
+                                                          "Total size of hash table index [Mb]"
+                                                          ))
+results_benchmarking_strobemap_melted <- results_benchmarking_strobemap_melted %>% filter(variable %in% plotted_variables)
+
+ggplot(results_benchmarking_strobemap_melted %>% filter(genome == "Human Chr.21"))+
+  geom_col(aes(x = seeding, y = value/10, fill=seeding))+
+  scale_fill_manual(values = c("#F8766D", "#00B0F6", "blue", "#E76BF3"))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        legend.position = "none")+
+  facet_grid(variable~genome, labeller = label_wrap_gen(width=14), scales="free_y")
+ggsave("../output/figs/benchmarking_strobemap/suppl_benchmarking_strobemap_human.pdf", width = 3.55, height = 4)
+ggsave("../output/figs/benchmarking_strobemap/suppl_benchmarking_strobemap_human.png", width = 3.55, height = 4)
+
+ggplot(results_benchmarking_strobemap_melted %>% filter(genome == "E.coli"))+
+  geom_col(aes(x = seeding, y = value/10, fill=seeding))+
+  scale_fill_manual(values = c("#F8766D", "#00B0F6", "blue", "#E76BF3"))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        legend.position = "none")+
+  facet_grid(variable~genome, labeller = label_wrap_gen(width=14), scales="free_y")
+ggsave("../output/figs/benchmarking_strobemap/suppl_benchmarking_strobemap_ecoli.pdf", width = 3.5, height = 4)
+ggsave("../output/figs/benchmarking_strobemap/suppl_benchmarking_strobemap_ecoli.png", width = 3.5, height = 4)
+```
+
+
+
+```{r Code for Suppl. Fig. S9}
+results_minimap <- read.table("../output/data tables/minimap_results", header=T, sep="&", dec = ".", check.names = FALSE)
+
+results_minimap_melted <- reshape2::melt(results_minimap %>% unite("seeding", "seeding":"settings", remove = TRUE, sep = " "), id=c("seeding", "mut_freq"))
+
+ggplot(results_minimap_melted)+
+  geom_point(aes(x=seeding, y=value, col=seeding), size = 2)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        legend.position = "none")+
+  #scale_fill_manual(values = c("#E76BF3", "#F8766D", "#F8766D", "blue", "#00B0F6"))+
+  scale_color_manual(values = c("#E76BF3", "#F8766D", "#F8766D", "blue", "#00B0F6"))+
+  facet_grid(variable ~ mut_freq, scales = "free")
+ggsave("../output/figs/benchmarking_minimap/suppl_minimap.pdf", width = 7, height = 18)
+
+
+unique(results_minimap_melted$variable)
+variable_plotted = c("total time [s]", "indexing time [s]", "aligning time [s]", "peak RSS [Gb]", "mapped correctly [%]")
+
+ggplot(results_minimap_melted %>% filter(variable %in% variable_plotted))+
+  geom_point(aes(x=seeding, y=value, col=seeding), size = 2)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        legend.position = "none")+
+  #scale_fill_manual(values = c("#E76BF3", "#F8766D", "#F8766D", "blue", "#00B0F6"))+
+  scale_color_manual(values = c("#E76BF3", "#F8766D", "#F8766D", "blue", "#00B0F6"))+
+  facet_grid(variable ~ mut_freq, scales = "free")
+ggsave("../output/figs/benchmarking_minimap/suppl_minimap_1.pdf", width = 5.5, height = 9)
+
+
+ggplot(results_minimap_melted %>% filter(!variable %in% variable_plotted))+
+  geom_point(aes(x=seeding, y=value, col=seeding), size = 2)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        legend.position = "none")+
+  #scale_fill_manual(values = c("#E76BF3", "#F8766D", "#F8766D", "blue", "#00B0F6"))+
+  scale_color_manual(values = c("#E76BF3", "#F8766D", "#F8766D", "blue", "#00B0F6"))+
+  facet_grid(variable ~ mut_freq, scales = "free")
+ggsave("../output/figs/benchmarking_minimap/suppl_minimap_2.pdf", width = 5.5, height = 9)
+```
+
+
+
+
+
+

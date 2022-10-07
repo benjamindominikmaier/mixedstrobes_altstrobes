@@ -1,0 +1,17 @@
+datastructure,k,acc,ehits
+kmers,18,NC_000021.9,47.89
+kmers,24,NC_000021.9,23.59
+kmers,30,NC_000021.9,15.65
+kmers,36,NC_000021.9,12.12
+randstrobes,18,NC_000021.9,31.88
+randstrobes,24,NC_000021.9,18.75
+randstrobes,30,NC_000021.9,13.34
+randstrobes,36,NC_000021.9,10.41
+mixedrandstrobes,18,NC_000021.9,32.5
+mixedrandstrobes,24,NC_000021.9,19.36
+mixedrandstrobes,30,NC_000021.9,13.66
+mixedrandstrobes,36,NC_000021.9,10.66
+altstrobes,18,NC_000021.9,30.71
+altstrobes,24,NC_000021.9,17.84
+altstrobes,30,NC_000021.9,13.13
+altstrobes,36,NC_000021.9,10.22

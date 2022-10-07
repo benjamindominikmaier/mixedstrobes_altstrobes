@@ -13,12 +13,13 @@ import RMQT as RMaxQST
 
 NAM = namedtuple('NAM', ['x', 'y', 'c', 'd', 'val', 'j', "chr_id"])
 
-
-'''
-    Below fast[a/q] reader function taken from https://github.com/lh3/readfq/blob/master/readfq.py
-'''
-
 def readfq(fp): # this is a generator function
+    '''
+    Fast[a/q] reader function taken from https://github.com/lh3/readfq/blob/master/readfq.py
+
+    :param fp:
+    :returns:
+    '''
     last = None # this is a buffer keeping the last unprocessed line
     while True: # mimic closure; is it a bad idea?
         if not last: # the first record or a record following a fastq
@@ -49,9 +50,14 @@ def readfq(fp): # this is a generator function
                 yield name, (seq, None) # yield a fasta record instead
                 break
 
+
 def get_NAM_records(NAM_path, reads):
     '''
-        Reads contains all the relevant reads in the batch to read mems from
+    Reads contains all the relevant reads in the batch to read mems from
+
+    :param NAM_path:
+    :param reads:
+    :returns:
     '''
     for i, line in enumerate(open(NAM_path, 'r')):
         if line[0] == '>':
@@ -93,17 +99,41 @@ def get_NAM_records(NAM_path, reads):
     yield read_acc, read_mems_tmp
 
 
-
 def argmax(iterable):
+    """
+    Header
+
+    :param iterable:
+    :returns:
+    """
     return max(enumerate(iterable), key=lambda x: x[1])[0]
 
+
 def max_both(iterable):
+    """
+    Header
+
+    :param iterable:
+    :returns:
+    """
     return max(enumerate(iterable), key=lambda x: x[1])
+
 
 def all_solutions_c_max_indicies(C, C_max):
     return [i for i, c in enumerate(C) if c == C_max]
 
-def reconstruct_all_solutions(mems, all_C_max_indicies, trace_vector, C, mam_mode = False):
+
+def reconstruct_all_solutions(mems, all_C_max_indicies, trace_vector, C, mam_mode: bool=False):
+    """
+    Header
+
+    :param mems:
+    :param all_C_max_indicies:
+    :param trace_vector:
+    :param C:
+    :param mam_mode:
+    :returns:
+    """
     # solution_index = argmax(C)
     solutions = []
     for solution_index in all_C_max_indicies:
@@ -118,14 +148,15 @@ def reconstruct_all_solutions(mems, all_C_max_indicies, trace_vector, C, mam_mod
         solutions.append( solution[::-1] )
     return value, solutions
 
+
 def colinear_solver_read_coverage(mems, max_intron):
     """
-        Algorithm 15.1 in Genome scale algorithmic design, Makinen et al.
+    Algorithm 15.1 in Genome scale algorithmic design, Makinen et al.
 
-        Using lists instead of Binary search trees for range max queries,
-        so n^2 time complexity instead of O(n log n).
+    Using lists instead of Binary search trees for range max queries,
+    so n^2 time complexity instead of O(n log n).
 
-        each NAM is an Namedtuple. python object
+    each NAM is an Namedtuple. python object
 
     """
     # assert mems == sorted(mems, key = lambda x: x.y )
@@ -195,7 +226,14 @@ def colinear_solver_read_coverage(mems, max_intron):
     return solutions, C_max #, is_unique_solution(C)
     # traceback(C, best_solution_index)
 
+
 def make_leafs_power_of_2(mems):
+    """
+    Header
+
+    :param mems:
+    :returns:
+    """
     nodes = []
     nodes.append( RMaxQST.Node(-1, -1, -2**32, -1) ) # add an start node in case a search is smaller than any d coord in tree
     for i, mem in enumerate(mems):
@@ -219,10 +257,10 @@ def make_leafs_power_of_2(mems):
 
 def n_logn_read_coverage(mems):
     """
-        Algorithm 15.1 in Genome scale algorithmic design, Makinen et al.
+    Algorithm 15.1 in Genome scale algorithmic design, Makinen et al.
 
-        Using Binary search trees for range max queries,
-        so n log n time complexity. Each mem is an Namedtuple. python object
+    Using Binary search trees for range max queries,
+    so n log n time complexity. Each mem is an Namedtuple. python object
 
     """
     # assert mems == sorted(mems, key=lambda x: x.y)
@@ -260,7 +298,6 @@ def n_logn_read_coverage(mems):
             print("BUG", T_max)
             sys.exit()
 
-
         d = mem.d
         I_max, j_prime_b, node_pos  = RMaxQST.range_query(I, c, d, len(I_leafs))
         # print("C_b:", I_max +  mem.d, I_max, j_prime_b, node_pos, leaf_to_update )
@@ -290,7 +327,6 @@ def n_logn_read_coverage(mems):
         RMaxQST.update(T, leaf_to_update, value, n) # point update
         RMaxQST.update(I, leaf_to_update, value - mem.d, n) # point update
 
-
     # C_max, solution = reconstruct_solution(mems, C, trace_vector)
     # print("C", C)
     # print(trace_vector)
@@ -305,6 +341,12 @@ def n_logn_read_coverage(mems):
 
 
 def read_sam(sam_file):
+    """
+    Header
+
+    :param sam_file:
+    :returns:
+    """
     SAM_file = pysam.AlignmentFile(sam_file, "r", check_sq=False)
     read_positions = {} # acc -> [ref_id, ref_start, refstop]
 
@@ -322,6 +364,15 @@ def read_sam(sam_file):
 
 
 def compute_overlap_with_truth_genome(true_chr_id, t_start, t_stop, nams):
+    """
+    Header
+
+    :param true_chr_id:
+    :param t_start:
+    :param t_stop:
+    :param nams:
+    :returns:
+    """
     tot_overlap = 0
     tot_nam_length = 0
     for n in nams:
@@ -343,7 +394,6 @@ def compute_overlap_with_truth_genome(true_chr_id, t_start, t_stop, nams):
             else:
                 print("BUG!", true_chr_id, t_start, t_stop, n.x, n.y )
 
-
         tot_nam_length += n.y - n.x
     # print(tot_overlap, tot_nam_length)
     # print(tot_overlap/tot_nam_length)
@@ -351,6 +401,12 @@ def compute_overlap_with_truth_genome(true_chr_id, t_start, t_stop, nams):
 
 
 def read_paf(paf_file):
+    """
+    Header
+
+    :param paf_file:
+    :returns:
+    """
     read_positions = {} # acc -> [ref_id, ref_start, refstop]
     for line in open(paf_file, 'r'):
         vals = line.split()
@@ -361,13 +417,34 @@ def read_paf(paf_file):
         read_positions[read_acc][ref_name] = (reference_start, reference_end)
     return read_positions
 
+
 def overlap(q_a, q_b, p_a, p_b):
+    """
+    Header
+
+    :param q_a:
+    :param q_b:
+    :param p_a:
+    :param p_b:
+    :returns:
+    """
     assert q_a <= q_b and p_a <= p_b
     # if (q_a == q_b) or (p_a == p_b):
     #     print("Cigar bug")
     return  (p_a <= q_a <= p_b) or (p_a <= q_b <= p_b) or (q_a <= p_a <= q_b) or (q_a <= p_b <= q_b)
 
+
 def compute_overlap_with_truth_read(true_locations, ref_id, read_id, nams, read_lengths):
+    """
+    Header
+
+    :param true_locations:
+    :param ref_id:
+    :param read_id:
+    :param nams:
+    :param read_lengths:
+    :returns:
+    """
     # get overlap span coordinates on 'reference read' from genome alignment coordinates
     ref_chr_id, ref_t_start, ref_t_end, ref_is_rc =  true_locations[ref_id]
     query_chr_id,  query_t_start,  query_t_end, query_is_rc =  true_locations[read_id]
@@ -434,11 +511,25 @@ def compute_overlap_with_truth_read(true_locations, ref_id, read_id, nams, read_
 
 
 def e_size(collinear_chain_nam_sizes, genome_size):
+    """
+    Header
+
+    :param collinear_chain_nam_sizes:
+    :param genome_size:
+    :returns:
+    """
     sum_of_squares = sum([x**2 for x in collinear_chain_nam_sizes])
     # print("sum_of_squares", sum_of_squares, genome_size)
     return sum_of_squares/genome_size
 
+
 def get_time_and_mem(runtime_file):
+    """
+    Header
+
+    :param runtime_file:
+    :returns:
+    """
     time, mem = '', ''
     for l in runtime_file:
         if re.search('[\d.]+ real', l):
@@ -450,8 +541,8 @@ def get_time_and_mem(runtime_file):
     # print(time, mem)
     return time, mem/1000
 
-def main(args):
 
+def main(args):
     time_in_sec, mem_in_mb = get_time_and_mem(open(args.runtime_file, 'r'))
     if args.refs:
         ref_lengths = { acc : len(seq) for acc, (seq,qual) in readfq(open(args.refs, 'r'))}

@@ -7,14 +7,6 @@ import argparse
 import copy
 import operator
 
-# import errno
-# from time import time
-# import re
-
-# import random
-# import parasail
-# import pysam
-
 from collections import defaultdict, deque
 from sys import stdout
 from array import array
@@ -313,6 +305,137 @@ def seq_to_minstrobes_iter(seq: str, k_size: int, strobe_w_min_offset: int,
         yield positions, hash_value
 
 
+def seq_to_altstrobes_iter(seq: str, k_size1: int, k_size2: int, strobe_w_min_offset: int,
+                           strobe_w_max_offset: int, prime: int, w: int,
+                           order: int, generalized: bool=False, arg: int=0) -> Iterator[tuple]:
+    """
+    Iterator for creation of altstrobes of any order
+
+    :param seq: a string with a nucleotide sequence
+    :param k_size1/2: length of each strobe
+    :param strobe_w_min_offset: minimum window offset to the previous window (wMin > 0)
+    :param strobe_w_max_offset: maximum window offset to the previous window (wMin <= wMax)
+    :param prime: prime number (q) in minimizing h(m)+h(mj) mod q
+    :param w: number of hashes used in a sliding window for thinning (w=1 means no thinning)
+    :param order: number of substrings/strobes
+    :returns: an iterator for creating altstrobes
+    """
+    assert order % 2 == 0, "Number of strobes has to be even in this implementation"
+
+    hash_seq_list1 = [(i, hash(seq[i:i+k_size1])) for i in range(len(seq) - k_size1 + 1)]
+    hash_seq_list2 = [(i, hash(seq[i:i+k_size2])) for i in range(len(seq) - k_size2 + 1)]
+    strobe_w_min_offset1 = int(strobe_w_min_offset - (k_size1-k_size2)/2)
+    strobe_w_max_offset1 = int(strobe_w_max_offset - (k_size1-k_size2)/2)
+    strobe_w_min_offset2 = int(strobe_w_min_offset + (k_size1-k_size2)/2)
+    strobe_w_max_offset2 = int(strobe_w_max_offset + (k_size1-k_size2)/2)
+    required_length1 = order * strobe_w_max_offset - strobe_w_max_offset1
+    required_length2 = order * strobe_w_max_offset - strobe_w_max_offset2
+
+    # print(strobe_w_min_offset1, strobe_w_max_offset1)
+    # print(strobe_w_min_offset2, strobe_w_max_offset2)
+
+    # Number of distinct hash values
+    # print(len(set(hash(seq[i:i+k_size1]) for i in range(len(seq) - k_size1 + 1))))
+    # print(len(set(hash(seq[i:i+k_size2]) for i in range(len(seq) - k_size2 + 1))))
+
+    # thinning
+    if w > 1:
+        # produce a subset of positions, still with same index as in full sequence
+        hash_seq_list_thinned1 = thinner([h for i, h in hash_seq_list1], w)
+        hash_seq_list_thinned2 = thinner([h for i, h in hash_seq_list2], w)
+    else:
+        hash_seq_list_thinned1 = hash_seq_list1
+        hash_seq_list_thinned2 = hash_seq_list2
+
+    for index_position, (p1, hash_m1) in enumerate(hash_seq_list_thinned1):  # [:-k_size]:
+        if p1 >= int(len(hash_seq_list2) - order * (k_size1 + k_size2)/2 + k_size1):
+            break
+        # hash_m1 = hash_seq_list[p]
+        print(index_position)
+
+        if hash_m1 % 2 == arg: # decision about whether k1 or k2 should be seeded first
+            seed_k1 = True
+            index = [p1, ] # -p1
+            min_hash_val = hash_m1
+            required_length = required_length1
+        else:
+            seed_k1 = False
+            if generalized:
+                index = [p1, p1]
+            else:
+                index = [p1, p1+k_size1]
+            min_hash_val = hash_seq_list2[index_position][1]
+            required_length = required_length2
+
+        windows = list()
+        if p1 + required_length <= min(len(hash_seq_list2), len(hash_seq_list1)):
+            current_strobe_offset = p1
+            for window_order in range(1, order):
+                if seed_k1:  # seed strobe of length k2
+                    start = strobe_w_min_offset2 + current_strobe_offset
+                    current_strobe_offset += strobe_w_max_offset2  # update current offset
+                    end = min(current_strobe_offset, len(hash_seq_list2))
+                else:  # seed strobe of length k1
+                    start = strobe_w_min_offset1 + current_strobe_offset
+                    current_strobe_offset += strobe_w_max_offset1  # update current offset
+                    end = min(current_strobe_offset, len(hash_seq_list1))
+
+                windows.append((start, end))
+                seed_k1 = not seed_k1  # alternate k1 and k2
+
+        else:  # shrinking at end of sequence
+            current_strobe_offset = p1
+            current_strobe_length = p1
+            for window_order in range(1, order):
+                if seed_k1:
+                    current_strobe_length += k_size2
+                    start = (max(
+                        current_strobe_length,
+                        len(hash_seq_list2) + strobe_w_min_offset2 - (order - window_order) * strobe_w_max_offset - int((k_size1-k_size2)/2)
+                        )
+                    )
+                    current_strobe_offset += strobe_w_max_offset2  # update current offset
+                    end = min(current_strobe_offset, len(hash_seq_list2))
+                else:
+                    current_strobe_length += k_size1
+                    start = (max(current_strobe_length,
+                        len(hash_seq_list1) + strobe_w_min_offset1 - (order - window_order) * strobe_w_max_offset + int((k_size1-k_size2)/2)
+                        )
+                    )
+                    current_strobe_offset += strobe_w_max_offset1  # update current offset
+                    end = min(current_strobe_offset, len(hash_seq_list1))
+
+                windows.append((start, end))
+                seed_k1 = not seed_k1
+
+        min_values = []
+        for index_order in range(1, order):
+            seed_k1 = not seed_k1  # reset first as statement is still incorrect (it is flipped an uneven number of times)
+            if seed_k1:
+                min_index, min_value = argmin([
+                    (min_hash_val + hash_seq_list2[i][1]) % prime
+                    for i in range(*windows[index_order-1])
+                ])
+                min_hash_val = min_hash_val + (index_order * (-1)**index_order) * hash_seq_list2[windows[index_order-1][0] + min_index][1]
+                if generalized:
+                    index.append(min_index+windows[index_order-1][0])
+                    index.append(min_index+windows[index_order-1][0])
+                else:
+                    index.append(min_index+windows[index_order-1][0])
+                    index.append(min_index+windows[index_order-1][0]+k_size1)
+                min_values.append(min_value)
+            else:
+                min_index, min_value = argmin([
+                    (min_hash_val + hash_seq_list1[i][1]) % prime
+                    for i in range(*windows[index_order-1])
+                ])
+                min_hash_val = min_hash_val + (index_order * (-1)**index_order) * hash_seq_list1[windows[index_order-1][0] + min_index][1]
+                index.append(min_index+windows[index_order-1][0]) # -
+                min_values.append(min_value)
+
+        yield index, min_hash_val, min_values
+
+
 def seq_to_mixedhybridstrobes_iter(seq: str, k_size: int, w_min: int,
                                    w_max: int, prime: int, w: int, order: int,
                                    denominator: int,
@@ -518,6 +641,121 @@ def seq_to_mixedrandstrobes_iter(seq: str, k_size: int, strobe_w_min_offset: int
         else:  # pick k-mer
             positions = tuple(p1 + (strobe_num) * k_size for strobe_num in range(order))
             yield positions, hash(seq[p1: p1+k_size*order])
+
+
+def seq_to_mixedaltstrobes_iter(seq: str, k_size1: int, k_size2: int, strobe_w_min_offset: int,
+                                strobe_w_max_offset: int, prime: int, w: int,
+                                order: int, denominator: int, numerator: int) -> Iterator[tuple]:
+    """
+    Iterator for creating of mixedaltstrobes of any order
+
+    :param seq: a string with a nucleotide sequence
+    :param k_size1/2: length of each strobe, k1 <= k2
+    :param strobe_w_min_offset: minimum window offset to the previous window (wMin > 0)
+    :param strobe_w_max_offset: maximum window offset to the previous window (wMin <= wMax)
+    :param prime: prime number (q) in minimizing h(m)+h(mj) mod q
+    :param w: number of hashes used in a sliding window for thinning (w=1 means no thinning)
+    :param order: number of substrings/strobes
+    :param denominator: denominator and numerator determine the fraction of sampled strobemers
+    :param numerator: denominator and numerator determine the fraction of sampled strobemers
+    :returns: an iterator for creating mixedaltstrobes
+    """
+    hash_seq_list1 = [(i, hash(seq[i:i+k_size1])) for i in range(len(seq) - k_size1 + 1)]
+    hash_seq_list2 = [(i, hash(seq[i:i+k_size2])) for i in range(len(seq) - k_size2 + 1)]
+    strobe_w_max_offset2 = int(strobe_w_max_offset + (k_size1-k_size2)/2)
+    strobe_w_min_offset2 = int(strobe_w_min_offset + (k_size1-k_size2)/2)
+    strobe_w_max_offset -= int((k_size1-k_size2)/2)
+    strobe_w_min_offset -= int((k_size1-k_size2)/2)
+
+    # thinning
+    if w > 1:
+        # produce a subset of positions, still with same index as in full sequence
+        hash_seq_list_thinned1 = thinner([h for i, h in hash_seq_list1], w)
+        hash_seq_list_thinned2 = thinner([h for i, h in hash_seq_list2], w)
+    else:
+        hash_seq_list_thinned1 = hash_seq_list1
+        hash_seq_list_thinned2 = hash_seq_list2
+
+    for index_position, (p1, hash_m1) in enumerate(hash_seq_list_thinned1):  # [:-k_size]:
+        if p1 >= len(hash_seq_list2) - (order-1)*k_size2:
+            break
+        # hash_m1 = hash_seq_list[p]
+
+        if hash_m1 % denominator < numerator:  # pick altstrobe
+            if hash_m1 % 2 == 0: # first x, then 2x (e.g. 10-20)
+                # print("10-20")
+                if p1 + (order-1) * strobe_w_max_offset2 <= len(hash_seq_list2):
+                    windows = list()
+                    for window_order in range(1, order):
+                        start = p1 + strobe_w_min_offset2 + (window_order-1) * strobe_w_max_offset2
+                        end = min(p1 + window_order * strobe_w_max_offset2, len(hash_seq_list2))
+                        windows.append((start, end))
+
+                else:
+                    windows = list()
+                    for window_order in range(1, order):
+                        start = (max(
+                            p1+window_order*k_size2,
+                            len(hash_seq_list2) + strobe_w_min_offset2 - (order - window_order) * strobe_w_max_offset2
+                            )
+                        )
+
+                        end = min(p1 + window_order * strobe_w_max_offset2, len(hash_seq_list2))
+                        windows.append((start, end))
+
+                index = [p1, ] # -p1
+                min_values = []
+                min_hash_val = hash_m1
+                for index_order in range(1, order):
+                    min_index, min_value = argmin([
+                        (min_hash_val + hash_seq_list2[i][1]) % prime
+                        for i in range(*windows[index_order-1])
+                    ])
+
+                    min_hash_val = min_hash_val + (index_order * (-1)**index_order) * hash_seq_list2[windows[index_order-1][0] + min_index][1]
+                    index.append(min_index+windows[index_order-1][0])
+                    index.append(min_index+windows[index_order-1][0]+k_size1)
+                    min_values.append(min_value)
+
+            else: # first 2x, then x (e.g. 20-10)
+                # print("20-10")
+                if p1 + (order-1) * strobe_w_max_offset <= len(hash_seq_list1):
+                    windows = list()
+                    for window_order in range(1, order):
+                        start = p1 + strobe_w_min_offset + (window_order-1) * strobe_w_max_offset
+                        end = min(p1 + window_order * strobe_w_max_offset, len(hash_seq_list1))
+                        windows.append((start, end))
+
+                else:
+                    windows = list()
+                    for window_order in range(1, order):
+                        start = (max(
+                            p1+window_order*k_size1,
+                            len(hash_seq_list1) + strobe_w_min_offset - (order - window_order) * strobe_w_max_offset
+                            )
+                        )
+
+                        end = min(p1 + window_order * strobe_w_max_offset, len(hash_seq_list1))
+                        windows.append((start, end))
+
+                index = [p1, p1+k_size1]
+                min_values = []
+                min_hash_val = hash_seq_list2[index_position][1]
+                for index_order in range(1, order):
+                    min_index, min_value = argmin([
+                        (min_hash_val + hash_seq_list1[i][1]) % prime
+                        for i in range(*windows[index_order-1])
+                    ])
+
+                    min_hash_val = min_hash_val + (index_order * (-1)**index_order) * hash_seq_list1[windows[index_order-1][0] + min_index][1]
+                    index.append(min_index+windows[index_order-1][0]) # -
+
+            yield index, min_hash_val
+
+        else:  # pick k-mer
+            index = tuple(p1 + (strobe_num) * k_size1 for strobe_num in range(order+1))
+            l = int((k_size1+k_size2)/2*order)
+            yield index, hash(seq[p1: p1+l])
 
 
 def seq_to_kmer_iter(seq: str, k_size: int, w: int) -> Iterator[tuple]:
@@ -814,6 +1052,73 @@ def build_mixedhybridstrobe_index(refs, k_size: int,
     return idx, ref_id_to_accession, cntr
 
 
+def build_altstrobe_index(refs, k_size1: int, k_size2: int,
+                          strobe_w_min_offset: int, strobe_w_max_offset: int,
+                          prime: int, w: int, order: int) -> tuple:
+    """
+    Build strobemers from references
+
+    :param refs: reference fasta file
+    :param k_size: length of all strobes combined
+    :param strobe_w_min_offset: minimum window offset to the previous window (wMin > 0)
+    :param strobe_w_max_offset: maximum window offset to the previous window (wMin <= wMax)
+    :param prime: rime number (q) in minimizing h(m)+h(mj) mod q
+    :param w: number of hashes used in a sliding window for thinning (w=1 means no thinning)
+    :param order: number of substrings/strobes
+    :returns: a tuple with an index-dictionary, a reference-to-accession-number dictionary and a counter of altstrobes created from references
+    """
+    idx = defaultdict(lambda: array("L"))
+    ref_id_to_accession = {}
+    cntr = 0
+
+    for r_id, (ref_acc, (seq, _)) in enumerate(help_functions.readfq(refs)):
+        ref_id_to_accession[r_id] = ref_acc
+        for positions, hash_val in globals()["seq_to_altstrobes_iter"](seq, k_size1, k_size2, strobe_w_min_offset, strobe_w_max_offset, prime, w, order):
+            idx[hash_val].append(r_id)
+            for pos in positions:
+                idx[hash_val].append(pos)
+            cntr += 1
+            if cntr % 1000000 == 0:
+                print("{0} altstrobes created from references".format(cntr))
+        # print(hash_val, r_id, pos)
+    return idx, ref_id_to_accession, cntr
+
+
+def build_mixedaltstrobe_index(refs, k_size1: int, k_size2: int,
+                               strobe_w_min_offset: int, strobe_w_max_offset: int,
+                               prime: int, w: int, order: int,
+                               denominator: int, numerator: int) -> tuple:
+    """
+    Build mixedaltstrobes (altstrobes/kmer) from references
+
+    :param refs: reference fasta file
+    :param k_size: length of all strobes combined
+    :param strobe_w_min_offset: minimum window offset to the previous window (wMin > 0)
+    :param strobe_w_max_offset: maximum window offset to the previous window (wMin <= wMax)
+    :param prime: prime number (q) in minimizing h(m)+h(mj) mod q
+    :param w: number of hashes used in a sliding window for thinning (w=1 means no thinning)
+    :param order: number of substrings/strobes
+    :param denominator: denominator and numerator determine the fraction of sampled strobemers
+    :param numerator: denominator and numerator determine the fraction of sampled strobemers
+    :returns: a tuple with an index-dictionary, a reference-to-accession-number dictionary and a counter of mixedaltstrobes created from references
+    """
+    idx = defaultdict(lambda: array("L"))
+    ref_id_to_accession = {}
+    cntr = 0
+
+    for r_id, (ref_acc, (seq, _)) in enumerate(help_functions.readfq(refs)):
+        ref_id_to_accession[r_id] = ref_acc
+        for positions, hash_val in globals()["seq_to_mixedaltstrobes_iter"](seq, k_size1, k_size2, strobe_w_min_offset, strobe_w_max_offset, prime, w, order, denominator, numerator):
+            idx[hash_val].append(r_id)
+            for pos in positions:
+                idx[hash_val].append(pos)
+            cntr += 1
+            if cntr % 1000000 == 0:
+                print("{0} mixedaltstrobes created from references".format(cntr))
+        # print(hash_val, r_id, pos)
+    return idx, ref_id_to_accession, cntr
+
+
 # def sort_merge(sorted_list):
 #     sort_merged_list = []
 #     curr_merge = sorted_list[0]
@@ -1106,6 +1411,9 @@ def main(args):
     elif args.hybridstrobe_index:
         idx, ref_id_to_accession, cntr = build_hybridstrobe_index(open(args.references, 'r'), args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)
         print("{0} hybridstrobes created from references\n".format(cntr))
+    elif args.altstrobe_index:
+        idx, ref_id_to_accession, cntr = build_altstrobe_index(open(args.references, 'r'), args.k, args.k2, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)
+        print("{0} altatrobes created from references\n".format(cntr))
     elif args.mixedminstrobe_index:
         idx, ref_id_to_accession, cntr = build_mixedstrobemer_index("mixedminstrobes", open(args.references, 'r'), args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)
         print("{0} mixedminstrobes created from references\n".format(cntr))
@@ -1115,6 +1423,9 @@ def main(args):
     elif args.mixedhybridstrobe_index:
         idx, ref_id_to_accession, cntr = build_mixedhybridstrobe_index(open(args.references, 'r'), args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)
         print("{0} mixedhybridstrobes created from references\n".format(cntr))
+    elif args.mixedaltstrobe_index:
+        idx, ref_id_to_accession, cntr = build_mixedaltstrobe_index(open(args.references, 'r'), args.k, args.k2, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)
+        print("{0} mixedaltstrobes created from references\n".format(cntr))
     else:
         raise NameError
 
@@ -1146,6 +1457,11 @@ def main(args):
             strobes = [(positions, h) for positions, h in seq_to_hybridstrobes_iter(seq, args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)]
             read_matches = get_merged_matches(strobes, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n)
 
+        elif args.altstrobe_index:
+            assert args.k <= args.k2, "[Warning] k should be smaller than k2"
+            strobes = [(positions, h) for positions, h in seq_to_altstrobes_iter(seq, args.k, args.k2, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)]
+            read_matches = get_merged_matches(strobes, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n+1)
+
         elif args.mixedminstrobe_index:
             strobes = [(positions, h) for positions, h in seq_to_mixedminstrobes_iter(seq, args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)]
             read_matches = get_merged_matches(strobes, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n)
@@ -1157,6 +1473,11 @@ def main(args):
         elif args.mixedhybridstrobe_index:
             strobes = [(positions, h) for positions, h in seq_to_mixedhybridstrobes_iter(seq, args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)]
             read_matches = get_merged_matches(strobes, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n)
+
+        elif args.mixedaltstrobe_index:
+            assert args.k <= args.k2, "[Warning] k should be smaller than k2"
+            strobes = [(positions, h) for positions, h in seq_to_mixedaltstrobes_iter(seq, args.k, args.k2, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)]
+            read_matches = get_merged_matches(strobes, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n+1)
 
         else:
             raise NameError
@@ -1186,6 +1507,11 @@ def main(args):
                 strobes_rc = [(positions, h) for positions, h in seq_to_hybridstrobes_iter(reverse_complement(seq), args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)]
                 read_matches_rc = get_merged_matches(strobes_rc, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n)
 
+            elif args.altstrobe_index:
+                assert args.k <= args.k2, "[Warning] k should be smaller than k2"
+                strobes_rc = [(positions, h) for positions, h in seq_to_altstrobes_iter(reverse_complement(seq), args.k, args.k2, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)]
+                read_matches_rc = get_merged_matches(strobes_rc, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n+1)
+
             elif args.mixedminstrobe_index:
                 strobes_rc = [(positions, h) for positions, h in seq_to_mixedminstrobes_iter(reverse_complement(seq), args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)]
                 read_matches_rc = get_merged_matches(strobes_rc, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n)
@@ -1197,6 +1523,11 @@ def main(args):
             elif args.mixedhybridstrobe_index:
                 strobes_rc = [(positions, h) for positions, h in seq_to_mixedhybridstrobes_iter(reverse_complement(seq), args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)]
                 read_matches_rc = get_merged_matches(strobes_rc, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n)
+
+            elif args.mixedaltstrobe_index:
+                assert args.k <= args.k2, "[Warning] k should be smaller than k2"
+                strobes_rc = [(positions, h) for positions, h in seq_to_mixedaltstrobes_iter(reverse_complement(seq), args.k, args.k2, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)]
+                read_matches_rc = get_merged_matches(strobes_rc, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n+1)
 
             else:
                 raise NameError
@@ -1219,7 +1550,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Calc identity", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--queries', type=str,  default=False, help='Path to query fasta or fastq file')
     parser.add_argument('--references', type=str,  default=False, help='Path to reference fasta or fastq file')
-    parser.add_argument('--k', type=int, default=15, help='Length of kmer/all strobes combined')
+    parser.add_argument('--k', type=int, default=15, help='Length of each strobe')
+    parser.add_argument('--k2', type=int, default=0, help='Length of each second strobe (altstrobes)')
     parser.add_argument('--strobe_w_min_offset', type=int, default=20, help='Strobemer window start offset from first k-mer. If kmer start at pos i, first\
                                                                             window will start at i+strobe_w_min_offset. Default: 20nt donwstream from start of first kmer.')
     parser.add_argument('--strobe_w_max_offset', type=int, default=70, help='Strobemer window end. If kmer start at pos i, first\
@@ -1240,9 +1572,11 @@ if __name__ == '__main__':
     parser.add_argument('--minstrobe_index', action="store_true",  help='Produce non-overlapping approximate matches for minstrobes')
     parser.add_argument('--randstrobe_index', action="store_true",  help='Produce non-overlapping approximate matches for randstrobes')
     parser.add_argument('--hybridstrobe_index', action="store_true",  help='Produce non-overlapping approximate matches for hybridstrobes')
+    parser.add_argument('--altstrobe_index', action="store_true",  help='Produce non-overlapping approximate matches for altstrobes')
     parser.add_argument('--mixedminstrobe_index', action="store_true",  help='Produce non-overlapping approximate matches for mixed minstrobes/kmers based on --strobe_fraction')
     parser.add_argument('--mixedrandstrobe_index', action="store_true",  help='Produce non-overlapping approximate matches for mixed randstrobes/kmers based on --strobe_fraction')
     parser.add_argument('--mixedhybridstrobe_index', action="store_true",  help='Produce non-overlapping approximate matches for mixed hybridstrobes/kmers based on --strobe_fraction')
+    parser.add_argument('--mixedaltstrobe_index', action="store_true",  help='Produce non-overlapping approximate matches for mixed altstrobes/kmers based on --strobe_fraction')
     parser.add_argument('--selfalign', action="store_true",  help='Aligns sequences to itself (mainly used for bugfixing). Default is not align\
                                                                     sequences to themselves if the same file is given as references and queries.')
     # parser.add_argument('--compress', type=str,  default=None, help='Compress output')
@@ -1257,6 +1591,11 @@ if __name__ == '__main__':
 
     if args.outfolder and not os.path.exists(args.outfolder):
         os.makedirs(args.outfolder)
+
+    if args.altstrobe_index or args.mixedaltstrobe_index:
+        assert args.k2 > 0, "Length of second strobe (altstrobes) not set"
+        assert args.k2 > args.k, "[Warning] It is recommended to choose k2 > k."
+
 
     # if args.w != 1:
     #     raise NotImplementedError("Currently only w=1 is allowed, i.e., no thinning is implemented")

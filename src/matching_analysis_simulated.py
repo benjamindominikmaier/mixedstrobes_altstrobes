@@ -5,6 +5,8 @@ import sys
 import argparse
 import random
 import numpy as np
+import collections
+from typing import Iterator
 
 try:
     import matplotlib
@@ -16,6 +18,7 @@ except (ImportError, RuntimeError):
 import seaborn as sns
 import pandas as pd
 from matplotlib import pyplot
+from itertools import chain
 
 from modules import help_functions
 from modules import indexing_Maier_altstrobes as indexing
@@ -24,7 +27,8 @@ from modules import indexing_Maier_altstrobes as indexing
 def get_match_coverage(seq_len: int, mers: dict, matches: dict, order: int,
                        span: int) -> int:
     """
-    Header
+    Computes the proportion of nucleotides covered by the k-mers and strobemers
+    from end-to-end including potential gaps
 
     :param seq_len:
     :param mers:
@@ -86,7 +90,8 @@ def seq_covered_spaced_kmers(mers: dict, matches: dict, seq: str, positions) -> 
 
 def get_sequence_coverage(mers: dict, matches: dict, order: int, k_len: int) -> int:
     """
-    Header
+    Computes the proportion of nucleotides covered by the strobes of matches,
+    this function distinguishes from match coverage by disregarding the gaps between the strobes
 
     :param mers:
     :param matches:
@@ -204,11 +209,30 @@ def statistics(ivls, seq: str, k: int) -> tuple:
     return nr_islands, gap_lengths, seq_covered
 
 
+def gap_finder(gap_pos):
+    """
+    """
+    count = 0
+    gap_lengths = []
+    for i in range(len(gap_pos) - 1):
+        # Check if the next number is consecutive
+        if gap_pos[i] + 1 == gap_pos[i+1]:
+            count += 1
+        else:
+            # If it is not append the count and restart counting
+            gap_lengths.append(count)
+            count = 1
+    # Since we stopped the loop one early append the last count
+    gap_lengths.append(count)
+    return gap_lengths
+
+
 def analyze_strobemers(seq1: str, seq2: str, k_size: int, order: int,
                        hash_fcn: str, w: int, w_low: int = 0, w_high: int = 50,
                        fraction: float = 0.5) -> tuple:
     """
-    Header
+    Computes number of matches, fraction of matches, sequence coverage,
+    match coverage and expected island size for generated seeds
 
     :param seq1: a string with a nucleotide sequence which is compared to seq2
     :param seq2: a string with a nucleotide sequence which is compared to seq1
@@ -219,10 +243,18 @@ def analyze_strobemers(seq1: str, seq2: str, k_size: int, order: int,
     :param w_low: minimum window offset to the previous window (wMin > 0)
     :param w_high: maximum window offset to the previous window (wMin <= wMax)
     :param fraction: a fraction of sampled strobemers, rest kmers (0 <= strobe_fraction <= 1)
-    :returns:
+    :returns: number of matches (int), fraction of matches (float),
+              sequence coverage (float), gap lengths (list), all_pos_vectors (list),
+              match coverage (float)
     """
+    mixed_methods = (
+        "mixedminstrobes", "mixedminstrobes_generalized", "mixedrandstrobes",
+        "mixedrandstrobes_generalized", "mixedhybridstrobes",
+        "mixedhybridstrobes_generalized"
+    )
+
     assert k_size % order == 0, "Not even kmer length, results will be different"
-    if hash_fcn in ("mixedminstrobes", "mixedminstrobes_generalized", "mixedrandstrobes", "mixedrandstrobes_generalized", "mixedhybridstrobes", "mixedhybridstrobes_generalized"):
+    if hash_fcn in mixed_methods:
         strobemers1 = getattr(indexing, hash_fcn)(seq1, k_size, w_low, w_high, w, order, fraction)
         strobemers2 = getattr(indexing, hash_fcn)(seq2, k_size, w_low, w_high, w, order, fraction)
     else:
@@ -240,15 +272,73 @@ def analyze_strobemers(seq1: str, seq2: str, k_size: int, order: int,
     return m, mp, seq_cov, gap_lengths, all_pos_vector, match_coverage
 
 
+def analyze_altstrobes_generalized(seq1: str, seq2: str, k_size1: int,
+                                   k_size2: int, order: int, w: int,
+                                   w_low: int = 0, w_high: int = 50,
+                                   fraction: float = 0.5) -> tuple:
+    """
+    Computes number of matches, fraction of matches, sequence coverage,
+    match coverage and expected island size for generated altstrobe seeds
+
+    :param seq1: a string with a nucleotide sequence which is compared to seq2
+    :param seq2: a string with a nucleotide sequence which is compared to seq1
+    :param k_size: length of all strobes/substrings (len(strobe_1) +  ... + len(strobe_n))
+    :param order: number of substrings/strobes
+    :param hash_fcn: a string with the function name of the kmer/strobemer protocol
+    :param w: number of hashes used in a sliding window for thinning (w=1 means no thinning)
+    :param w_low: minimum window offset to the previous window (wMin > 0)
+    :param w_high: maximum window offset to the previous window (wMin <= wMax)
+    :param fraction: a fraction of sampled strobemers, rest kmers (0 <= strobe_fraction <= 1)
+    :returns: number of matches (int), fraction of matches (float),
+              sequence coverage (float), gap lengths (list), match coverage (float)
+    """
+    altstrobes1 = indexing.altstrobes_generalized(seq1, k_size1, k_size2, w_low, w_high, w, order, arg=0)
+    altstrobes2 = indexing.altstrobes_generalized(seq2, k_size1, k_size2, w_low, w_high, w, order, arg=0)
+    altstrobes2_rev = indexing.altstrobes_generalized(seq2, k_size1, k_size2, w_low, w_high, w, order, arg=1)
+
+    matches = set(altstrobes1.values()) & (set(altstrobes2.values()) | set(altstrobes2_rev.values()))
+
+    m = len(matches)
+    mp = len(altstrobes1.values())
+
+    hash_values_tmp = list(altstrobes1.values())
+    hash_values = collections.Counter(hash_values_tmp)
+
+    altstrobe_positions = [key for key, value in altstrobes1.items() if value in matches]
+
+    sc_pos = []
+    mc_pos = []
+
+    for x1, x2, x3 in altstrobe_positions:
+        if x1 == x2:  # first k2, then k1
+            sc_pos.append(range(x1, x1+k_size2))
+            sc_pos.append(range(x3, x3+k_size1))
+            mc_pos.append(range(x1, x3+k_size1))
+        else:
+            sc_pos.append(range(x1, x1+k_size1))
+            sc_pos.append(range(x3, x3+k_size2))
+            mc_pos.append(range(x1, x3+k_size2))
+
+    sc_pos = set(chain.from_iterable(sc_pos))
+    mc_pos = set(chain.from_iterable(mc_pos))
+    gap_pos = [pos for pos in range(len(seq1)) if pos not in mc_pos]
+    gaps = gap_finder(gap_pos)
+
+    return m, mp, len(sc_pos), len(mc_pos), gaps
+
+
 def analyze_kmers(seq1: str, seq2: str, k_size: int, w: int) -> tuple:
     """
-    Header
+    Computes number of matches, fraction of matches, sequence coverage,
+    match coverage and expected island size for generated k-mer seeds
 
     :param seq1: a string with a nucleotide sequence which is compared to seq2
     :param seq2: a string with a nucleotide sequence which is compared to seq1
     :param k_size: length of the kmers
     :param w: number of kmers used in a sliding window for thinning (w=1 means no thinning)
-    :returns:
+    :returns: number of matches (int), fraction of matches (float),
+              sequence coverage (float), gap lengths (list), all_pos_vectors (list),
+              match coverage (float)
     """
     # kmers
     kmers_pos1 = indexing.kmers(seq1, k_size, w)
@@ -267,14 +357,17 @@ def analyze_kmers(seq1: str, seq2: str, k_size: int, w: int) -> tuple:
 
 def analyze_spaced_kmers(seq1: str, seq2: str, k_size: int, span_size: int, w: int) -> tuple:
     """
-    Header
+    Computes number of matches, fraction of matches, sequence coverage,
+    match coverage and expected island size for generated spaced kmer seeds
 
     :param seq1: a string with a nucleotide sequence which is compared to seq2
     :param seq2: a string with a nucleotide sequence which is compared to seq1
     :param k_size: length of the kmers
     :param span_size: length between first and last position
     :param w: number of spaced_kmers used in a sliding window for thinning (w=1 means no thinning)
-    :returns:
+    :returns: number of matches (int), fraction of matches (float),
+              sequence coverage (float), gap lengths (list), all_pos_vectors (list),
+              match coverage (float)
     """
     positions = set(random.sample(range(1, span_size-1), k_size-2))
     positions.add(0)
@@ -297,6 +390,9 @@ def analyze_altstrobes(seq1: str, seq2: str, k_size: int, order: int,
                        hash_fcn: str, w: int, w_low: int = 0, w_high: int = 50,
                        fraction: float = 0.5) -> tuple:
     """
+    Computes number of matches, fraction of matches, sequence coverage,
+    match coverage and expected island size for generated altstrobe seeds
+
     :param seq1: a string with a nucleotide sequence which is compared to seq2
     :param seq2: a string with a nucleotide sequence which is compared to seq1
     :param k_size: length of all strobes/substrings (len(strobe_1) +  ... + len(strobe_n))
@@ -306,43 +402,14 @@ def analyze_altstrobes(seq1: str, seq2: str, k_size: int, order: int,
     :param w_low: minimum window offset to the previous window (wMin > 0)
     :param w_high: maximum window offset to the previous window (wMin <= wMax)
     :param fraction: a fraction of sampled strobemers, rest kmers (0 <= strobe_fraction <= 1)
-    :returns:
+    :returns: number of matches (int), fraction of matches (float),
+              sequence coverage (float), gap lengths (list), all_pos_vectors (list),
+              match coverage (float)
     """
-    assert k_size % order == 0, "Not even kmer length, results will be different"
+
+    assert k_size % int(1.5*order) == 0, "Not even kmer length, results will be different"
     altstrobes1 = indexing.altstrobes(seq1, k_size, w_low, w_high, w, order)
     altstrobes2 = indexing.altstrobes(seq2, k_size, w_low, w_high, w, order)
-
-    order = order+1
-
-    matches = set(altstrobes1.values()) & set(altstrobes2.values())
-    m = len(matches)
-    mp = len(altstrobes1.values())
-    ivls, all_pos_vector = get_intervals(altstrobes1, matches, order)
-    nr_islands, gap_lengths, c = statistics(ivls, seq1, k_size//order)
-    seq_cov = get_sequence_coverage(altstrobes1, matches, order, k_size//order+1)
-    match_coverage = get_match_coverage(len(seq1), altstrobes1, matches, order, k_size//order)
-
-    return m, mp, seq_cov, gap_lengths, all_pos_vector, match_coverage
-
-
-def analyze_mixedaltstrobes(seq1: str, seq2: str, k_size: int, order: int,
-                       hash_fcn: str, w: int, w_low: int = 0, w_high: int = 50,
-                       fraction: float = 0.5) -> tuple:
-    """
-    :param seq1: a string with a nucleotide sequence which is compared to seq2
-    :param seq2: a string with a nucleotide sequence which is compared to seq1
-    :param k_size: length of all strobes/substrings (len(strobe_1) +  ... + len(strobe_n))
-    :param order: number of substrings/strobes
-    :param hash_fcn: a string with the function name of the kmer/strobemer protocol
-    :param w: number of hashes used in a sliding window for thinning (w=1 means no thinning)
-    :param w_low: minimum window offset to the previous window (wMin > 0)
-    :param w_high: maximum window offset to the previous window (wMin <= wMax)
-    :param fraction: a fraction of sampled strobemers, rest kmers (0 <= strobe_fraction <= 1)
-    :returns:
-    """
-    assert k_size % order == 0, "Not even kmer length, results will be different"
-    altstrobes1 = indexing.mixedaltstrobes(seq1, k_size, w_low, w_high, w, order, fraction)
-    altstrobes2 = indexing.mixedaltstrobes(seq2, k_size, w_low, w_high, w, order, fraction)
 
     order = order+1
 
@@ -357,31 +424,101 @@ def analyze_mixedaltstrobes(seq1: str, seq2: str, k_size: int, order: int,
     return m, mp, seq_cov, gap_lengths, all_pos_vector, match_coverage
 
 
-def print_matches(all_pos_vector, method: str):
+def analyze_mixedaltstrobes(seq1: str, seq2: str, k_size: int, order: int,
+                            hash_fcn: str, w: int, w_low: int = 0,
+                            w_high: int = 50, fraction: float = 0.5) -> tuple:
     """
-    Header
+    Computes number of matches, fraction of matches, sequence coverage,
+    match coverage and expected island size for generated mixedaltstrobe seeds
 
-    :param all_pos_vector:
-    :param method:
-    :returns:
+    :param seq1: a string with a nucleotide sequence which is compared to seq2
+    :param seq2: a string with a nucleotide sequence whichfrom itertools import chain is compared to seq1
+    :param k_size: length of all strobes/substrings (len(strobe_1) +  ... + len(strobe_n))
+    :param order: number of substrings/strobes
+    :param hash_fcn: a string with the function name of the kmer/strobemer protocol
+    :param w: number of hashes used in a sliding window for thinning (w=1 means no thinning)
+    :param w_low: minimum window offset to the previous window (wMin > 0)
+    :param w_high: maximum window offset to the previous window (wMin <= wMax)
+    :param fraction: a fraction of sampled strobemers, rest kmers (0 <= strobe_fraction <= 1)
+    :returns: number of matches (int), fraction of matches (float),
+              sequence coverage (float), gap lengths (list), all_pos_vectors (list),
+              match coverage (float)
     """
-    s = set(all_pos_vector)
-    for i in range(100):
-        if i in s:
-            print("X", end='')
-        else:
-            print(" ", end='')
-    print(method)
+
+    assert k_size % int(1.5*order) == 0, "Not even kmer length, results will be different"
+    altstrobes1 = indexing.mixedaltstrobes(seq1, k_size, w_low, w_high, w, order, fraction)
+    altstrobes2 = indexing.mixedaltstrobes(seq2, k_size, w_low, w_high, w, order, fraction)
+
+    order = order+1  # increase order by 1 as information about short-long combination requires one extra order
+
+    matches = set(altstrobes1.values()) & set(altstrobes2.values())
+    m = len(matches)
+    mp = len(altstrobes1.values())
+    ivls, all_pos_vector = get_intervals(altstrobes1, matches, order)
+    nr_islands, gap_lengths, c = statistics(ivls, seq1, k_size//order)
+    seq_cov = get_sequence_coverage(altstrobes1, matches, order, k_size//order)
+    match_coverage = get_match_coverage(len(seq1), altstrobes1, matches, order, k_size//order)
+
+    return m, mp, seq_cov, gap_lengths, all_pos_vector, match_coverage
 
 
-def get_e_size(all_islands, L: int, nr_exp: int) -> float:
+def analyze_mixedstrobes(method1: str, method2:str, seq1: str, seq2: str,
+                         k_size: int, order: int, hash_fcn: str, w: int,
+                         w_low: int = 0, w_high: int = 50,
+                         fraction: float = 0.5) -> tuple:
     """
-    Header
+    Computes number of matches, fraction of matches, sequence coverage,
+    match coverage and expected island size for generated mixed strobemer seeds
 
-    :param all_islands:
+    :param seq1: a string with a nucleotide sequence which is compared to seq2
+    :param seq2: a string with a nucleotide sequence whichfrom itertools import chain is compared to seq1
+    :param k_size: length of all strobes/substrings (len(strobe_1) +  ... + len(strobe_n))
+    :param order: number of substrings/strobes
+    :param hash_fcn: a string with the function name of the kmer/strobemer protocol
+    :param w: number of hashes used in a sliding window for thinning (w=1 means no thinning)
+    :param w_low: minimum window offset to the previous window (wMin > 0)
+    :param w_high: maximum window offset to the previous window (wMin <= wMax)
+    :param fraction: a fraction of sampled strobemers, rest kmers (0 <= strobe_fraction <= 1)
+    :returns: number of matches (int), fraction of matches (float),
+              sequence coverage (float), gap lengths (list), all_pos_vectors (list),
+              match coverage (float)
+    """
+
+    assert k_size % order == 0, "Not even kmer length, results will be different"
+    mixedstrobes1 = indexing.mixedstrobes(method1, method2, seq1, k_size, w_low, w_high, w, order, fraction)
+    mixedstrobes2 = indexing.mixedstrobes(method1, method2, seq2, k_size, w_low, w_high, w, order, fraction)
+
+    matches = set(mixedstrobes1.values()) & set(mixedstrobes2.values())
+    m = len(matches)
+    mp = len(mixedstrobes1.values())
+    mixedstrobe_positions = [key for key, value in mixedstrobes1.items() if value in matches]
+
+    sc_pos = []
+    mc_pos = []
+
+    for x1, x2 in mixedstrobe_positions:
+        sc_pos.append(x1)
+        sc_pos.append(x2)
+        mc_pos.append(range(min(x1), max(x2)+1))
+
+
+    sc_pos = set(chain.from_iterable(sc_pos))
+    mc_pos = set(chain.from_iterable(mc_pos))
+    gap_pos = [pos for pos in range(len(seq1)) if pos not in mc_pos]
+    gaps = gap_finder(gap_pos)
+
+    return m, mp, len(sc_pos), len(mc_pos), gaps
+
+
+def get_e_size(all_islands: list, L: int, nr_exp: int) -> float:
+    """
+    Computes the expected island size, whereby an island is the maximal interval
+    of consecutive nucleotides without matches:
+
+    :param all_islands: list with island size lengths
     :param L: an integer representing the desired sequence length for the analysis
     :param nr_exp: in integer representing the number of desired experiments
-    :returns:
+    :returns: float indicating the expected island size
     """
     # print("all_islands",all_islands)
     sum_of_squares = sum([x**2 for x in all_islands])
@@ -390,48 +527,38 @@ def get_e_size(all_islands, L: int, nr_exp: int) -> float:
 
 def main(args):
     """
+    Computes matching metrics (m, mp, sc, mc, e-size) for simulated sequences
+    using various seeding techniques (kmer-based, strobemers, altstrobes)
     """
-    L = 10000 # 10000
-    k_size = 30
-    nr_exp = 100  # 1000
-    w = 1  # thinning, w = 1  means no thinning. w =1, 10, 20 was used in the evaluations.
-    mut_freqs = [0.01, 0.05, 0.1]  # [0.1]
-    orders = [2, ]
-    w_low = 25
-    w_high = 50
-    methods = ("kmers", "spaced_kmers_dense", "spaced_kmers_sparse", "minstrobes", "randstrobes", "hybridstrobes", "altstrobes", "mixedminstrobes", "mixedrandstrobes", "mixedhybridstrobes", "mixedaltstrobes")
-    mixedstrobe_fractions = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 
-    # experiment_type choose between 'only_subs', 'controlled' or 'all'
-    experiment_type = "all"  # "controlled" # "all" #"only_subs" # "" # for spaced kmers
-    # mut_freq = 0.5 #0.01 #, 0.05, 0.1]
-    list_for_illustration = [[], [], [], [], [], []]
-
-    for mut_freq in mut_freqs:
+    for mut_freq in args.mut_freqs:
         print("MUTATION RATE:", mut_freq)
         results = dict()
 
-        for exp_id in range(nr_exp):
-            seq1 = "".join([random.choice("ACGT") for i in range(L)])
+        for exp_id in range(args.nr_exp):
+            if exp_id % 100 == 0:
+                print("Analyzed {0} simulated experiments". format(exp_id))
+
+            seq1 = "".join([random.choice("ACGT") for i in range(args.L)])
 
             # controlled or random experiment
-            if experiment_type == 'only_subs':
-                muts = set(random.sample(range(len(seq1)), int(L*mut_freq)))
+            if args.experiment_type == 'only_subs':
+                muts = set(random.sample(range(len(seq1)), int(args.L*mut_freq)))
                 seq2 = "".join([
                     seq1[i] if i not in muts
                     else random.choice([help_functions.reverse_complement(seq1[i])])
                     for i in range(len(seq1))
                 ])
-            elif experiment_type == 'controlled':
+            elif args.experiment_type == 'controlled':
                 # muts = set(range(15,L,15)) # every 15th nt for figure 2 only!
-                muts = set(range(20, L, 20))
+                muts = set(range(20, args.L, 20))
                 seq2 = "".join([
                     seq1[i] if i not in muts
                     else random.choice(['', help_functions.reverse_complement(seq1[i]), seq1[i] + random.choice("ACGT")])
                     for i in range(len(seq1))
                 ])
-            elif experiment_type == 'all':
-                muts = set(random.sample(range(len(seq1)), int(L*mut_freq)))
+            elif args.experiment_type == 'all':
+                muts = set(random.sample(range(len(seq1)), int(args.L*mut_freq)))
                 seq2 = "".join([
                     seq1[i] if i not in muts
                     else random.choice(['', help_functions.reverse_complement(seq1[i]), seq1[i] + random.choice("ACGT")])
@@ -441,10 +568,10 @@ def main(args):
                 print("Wrong experiment label specified")
                 sys.exit()
 
-            for hash_fcn in methods:
+            for hash_fcn in args.methods:
                 if hash_fcn == "kmers":
                     results.setdefault("kmers", {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
-                    m, mp, sc, gaps, all_pos_vector, match_coverage = analyze_kmers(seq1, seq2, k_size, w)
+                    m, mp, sc, gaps, all_pos_vector, match_coverage = analyze_kmers(seq1, seq2, args.k_size, args.w)
                     results["kmers"]["m"] += m
                     results["kmers"]["sc"] += sc
                     results["kmers"]["gaps"].append(gaps)
@@ -453,7 +580,7 @@ def main(args):
 
                 elif hash_fcn == "spaced_kmers_dense":
                     results.setdefault("spaced_kmers_dense", {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
-                    m, mp, sc, gaps, all_pos_vector, match_coverage = analyze_spaced_kmers(seq1, seq2, k_size, k_size+k_size//2, w)
+                    m, mp, sc, gaps, all_pos_vector, match_coverage = analyze_spaced_kmers(seq1, seq2, args.k_size, args.k_size+args.k_size//2, args.w)
                     results["spaced_kmers_dense"]["m"] += m
                     results["spaced_kmers_dense"]["sc"] += sc
                     results["spaced_kmers_dense"]["gaps"].append(gaps)
@@ -462,7 +589,7 @@ def main(args):
 
                 elif hash_fcn == "spaced_kmers_sparse":
                     results.setdefault("spaced_kmers_sparse", {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
-                    m, mp, sc, gaps, all_pos_vector, match_coverage = analyze_spaced_kmers(seq1, seq2, k_size, 3*k_size, w)
+                    m, mp, sc, gaps, all_pos_vector, match_coverage = analyze_spaced_kmers(seq1, seq2, args.k_size, 3*args.k_size, args.w)
                     results["spaced_kmers_sparse"]["m"] += m
                     results["spaced_kmers_sparse"]["sc"] += sc
                     results["spaced_kmers_sparse"]["gaps"].append(gaps)
@@ -470,85 +597,111 @@ def main(args):
                     results["spaced_kmers_sparse"]["mp"] += mp
 
                 elif hash_fcn == "altstrobes":
-                        results.setdefault("altstrobes", {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
-                        m, mp, sc, gaps, all_pos_vector, match_coverage = analyze_altstrobes(seq1, seq2, k_size, 2, hash_fcn, w, w_low=w_low, w_high=w_high)
-                        results["altstrobes"]["m"] += m
-                        results["altstrobes"]["sc"] += sc
-                        results["altstrobes"]["gaps"].append(gaps)
-                        results["altstrobes"]["mc"] += match_coverage
-                        results["altstrobes"]["mp"] += mp
+                    results.setdefault("altstrobes", dict())
+                    for order in args.orders:
+                        results["altstrobes"].setdefault((order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high), {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
+                        m, mp, sc, gaps, all_pos_vector, match_coverage = analyze_altstrobes(seq1, seq2, args.k_size, order, hash_fcn, args.w, w_low=args.w_low, w_high=args.w_high)
+                        results["altstrobes"][(order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high)]["m"] += m
+                        results["altstrobes"][(order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high)]["sc"] += sc
+                        results["altstrobes"][(order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high)]["gaps"].append(gaps)
+                        results["altstrobes"][(order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high)]["mc"] += match_coverage
+                        results["altstrobes"][(order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high)]["mp"] += mp
+
+                elif hash_fcn == "altstrobes_generalized":
+                    results.setdefault("altstrobes_generalized", dict())
+                    for k1, k2 in args.strobe_lengths:
+                        results["altstrobes_generalized"].setdefault((k1, k2), {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
+                        m, mp, sc, match_coverage, gaps = analyze_altstrobes_generalized(seq1, seq2, k1, k2, 2, args.w, w_low=args.w_low, w_high=args.w_high)
+                        results["altstrobes_generalized"][(k1, k2)]["m"] += m
+                        results["altstrobes_generalized"][(k1, k2)]["sc"] += sc
+                        results["altstrobes_generalized"][(k1, k2)]["gaps"].append(gaps)
+                        results["altstrobes_generalized"][(k1, k2)]["mc"] += match_coverage
+                        results["altstrobes_generalized"][(k1, k2)]["mp"] += mp
 
                 elif hash_fcn == "mixedaltstrobes":
                     results.setdefault(hash_fcn, dict())
-                    for order in orders:
-                        for fraction in mixedstrobe_fractions:
-                            results["mixedaltstrobes"].setdefault((order, k_size//order, w_low, w_high, fraction), {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
-                            m, mp, sc, gaps, all_pos_vector, match_coverage = analyze_mixedaltstrobes(seq1, seq2, k_size, order, hash_fcn, w, w_low=w_low, w_high=w_high, fraction=fraction)
-                            results["mixedaltstrobes"][(order, k_size//order, w_low, w_high, fraction)]["m"] += m
-                            results["mixedaltstrobes"][(order, k_size//order, w_low, w_high, fraction)]["sc"] += sc
-                            results["mixedaltstrobes"][(order, k_size//order, w_low, w_high, fraction)]["gaps"].append(gaps)
-                            results["mixedaltstrobes"][(order, k_size//order, w_low, w_high, fraction)]["mc"] += match_coverage
-                            results["mixedaltstrobes"][(order, k_size//order, w_low, w_high, fraction)]["mp"] += mp
+                    for order in args.orders:
+                        for fraction in args.strobe_fractions:
+                            results["mixedaltstrobes"].setdefault((order, args.k_size//order, args.w_low, args.w_high, fraction), {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
+                            m, mp, sc, gaps, all_pos_vector, match_coverage = analyze_mixedaltstrobes(seq1, seq2, args.k_size, order, hash_fcn, args.w, w_low=args.w_low, w_high=args.w_high, fraction=fraction)
+                            results["mixedaltstrobes"][(order, args.k_size//order, args.w_low, args.w_high, fraction)]["m"] += m
+                            results["mixedaltstrobes"][(order, args.k_size//order, args.w_low, args.w_high, fraction)]["sc"] += sc
+                            results["mixedaltstrobes"][(order, args.k_size//order, args.w_low, args.w_high, fraction)]["gaps"].append(gaps)
+                            results["mixedaltstrobes"][(order, args.k_size//order, args.w_low, args.w_high, fraction)]["mc"] += match_coverage
+                            results["mixedaltstrobes"][(order, args.k_size//order, args.w_low, args.w_high, fraction)]["mp"] += mp
+
+                elif hash_fcn == "mixedstrobes":
+                    results.setdefault(hash_fcn, dict())
+                    for order in args.orders:
+                        for fraction in args.strobe_fractions:
+                            results["mixedstrobes"].setdefault((args.method1, args.method2, order, args.k_size//order, args.w_low, args.w_high, fraction), {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
+                            m, mp, sc, match_coverage, gaps = analyze_mixedstrobes(args.method1, args.method2, seq1, seq2, args.k_size, order, hash_fcn, args.w, w_low=args.w_low, w_high=args.w_high, fraction=fraction)
+                            results["mixedstrobes"][(args.method1, args.method2, order, args.k_size//order, args.w_low, args.w_high, fraction)]["m"] += m
+                            results["mixedstrobes"][(args.method1, args.method2, order, args.k_size//order, args.w_low, args.w_high, fraction)]["sc"] += sc
+                            results["mixedstrobes"][(args.method1, args.method2, order, args.k_size//order, args.w_low, args.w_high, fraction)]["gaps"].append(gaps)
+                            results["mixedstrobes"][(args.method1, args.method2, order, args.k_size//order, args.w_low, args.w_high, fraction)]["mc"] += match_coverage
+                            results["mixedstrobes"][(args.method1, args.method2, order, args.k_size//order, args.w_low, args.w_high, fraction)]["mp"] += mp
 
                 elif hash_fcn in ("mixedminstrobes", "mixedminstrobes_generalized", "mixedrandstrobes", "mixedrandstrobes_generalized", "mixedhybridstrobes", "mixedhybridstrobes_generalized"):
                     results.setdefault(hash_fcn, dict())
-                    for order in orders:
-                        for fraction in mixedstrobe_fractions:
-                            results[hash_fcn].setdefault((order, k_size//order, w_low, w_high, fraction), {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
-                            m, mp, sc, gaps, all_pos_vector, match_coverage = analyze_strobemers(seq1, seq2, k_size, order, hash_fcn, w, w_low=w_low, w_high=w_high, fraction=fraction)
-                            results[hash_fcn][(order, k_size//order, w_low, w_high, fraction)]["m"] += m
-                            results[hash_fcn][(order, k_size//order, w_low, w_high, fraction)]["sc"] += sc
-                            results[hash_fcn][(order, k_size//order, w_low, w_high, fraction)]["gaps"].append(gaps)
-                            results[hash_fcn][(order, k_size//order, w_low, w_high, fraction)]["mc"] += match_coverage
-                            results[hash_fcn][(order, k_size//order, w_low, w_high, fraction)]["mp"] += mp
+                    for order in args.orders:
+                        for fraction in args.strobe_fractions:
+                            results[hash_fcn].setdefault((order, args.k_size//order, args.w_low, args.w_high, fraction), {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
+                            m, mp, sc, gaps, all_pos_vector, match_coverage = analyze_strobemers(seq1, seq2, args.k_size, order, hash_fcn, args.w, w_low=args.w_low, w_high=args.w_high, fraction=fraction)
+                            results[hash_fcn][(order, args.k_size//order, args.w_low, args.w_high, fraction)]["m"] += m
+                            results[hash_fcn][(order, args.k_size//order, args.w_low, args.w_high, fraction)]["sc"] += sc
+                            results[hash_fcn][(order, args.k_size//order, args.w_low, args.w_high, fraction)]["gaps"].append(gaps)
+                            results[hash_fcn][(order, args.k_size//order, args.w_low, args.w_high, fraction)]["mc"] += match_coverage
+                            results[hash_fcn][(order, args.k_size//order, args.w_low, args.w_high, fraction)]["mp"] += mp
 
                 else:
                     results.setdefault(hash_fcn, dict())
-                    for order in orders:
-                        results[hash_fcn].setdefault((order, k_size//order, w_low, w_high), {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
-                        m, mp, sc, gaps, all_pos_vector, match_coverage = analyze_strobemers(seq1, seq2, k_size, order, hash_fcn, w, w_low=w_low, w_high=w_high)
-                        results[hash_fcn][(order, k_size//order, w_low, w_high)]["m"] += m
-                        results[hash_fcn][(order, k_size//order, w_low, w_high)]["sc"] += sc
-                        results[hash_fcn][(order, k_size//order, w_low, w_high)]["gaps"].append(gaps)
-                        results[hash_fcn][(order, k_size//order, w_low, w_high)]["mc"] += match_coverage
-                        results[hash_fcn][(order, k_size//order, w_low, w_high)]["mp"] += mp
+                    for order in args.orders:
+                        results[hash_fcn].setdefault((order, args.k_size//order, args.w_low, args.w_high), {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
+                        m, mp, sc, gaps, all_pos_vector, match_coverage = analyze_strobemers(seq1, seq2, args.k_size, order, hash_fcn, args.w, w_low=args.w_low, w_high=args.w_high)
+                        results[hash_fcn][(order, args.k_size//order, args.w_low, args.w_high)]["m"] += m
+                        results[hash_fcn][(order, args.k_size//order, args.w_low, args.w_high)]["sc"] += sc
+                        results[hash_fcn][(order, args.k_size//order, args.w_low, args.w_high)]["gaps"].append(gaps)
+                        results[hash_fcn][(order, args.k_size//order, args.w_low, args.w_high)]["mc"] += match_coverage
+                        results[hash_fcn][(order, args.k_size//order, args.w_low, args.w_high)]["mp"] += mp
 
         for protocol in results:
-            if protocol == "kmers" or protocol == "spaced_kmers_sparse" or protocol == "spaced_kmers_dense" or protocol == "altstrobes":
+            if protocol == "kmers" or protocol == "spaced_kmers_sparse" or protocol == "spaced_kmers_dense":
                 flat = [g for l in results[protocol]["gaps"] for g in l]
                 if flat:
                     # avg_island_len = sum(flat)/len(flat)
                     # print(protocol)
-                    e_size = get_e_size(flat, L, nr_exp)
+                    e_size = get_e_size(flat, args.L, args.nr_exp)
                 # else:
                 #     avg_island_len = 0
                 res = [
                     round(100*results[protocol]["m"]/results[protocol]["mp"], 1),
-                    100*results[protocol]["sc"]/(L*nr_exp),
-                    100*results[protocol]["mc"]/(L*nr_exp),
+                    100*results[protocol]["sc"]/(args.L*args.nr_exp),
+                    100*results[protocol]["mc"]/(args.L*args.nr_exp),
                     e_size
                 ]
                 print(protocol, " & ".join([str(round(r, 1)) for r in res]))
             else:
                 for params in results[protocol]:
+                    # print(results[protocol])
                     flat = [g for l in results[protocol][params]["gaps"] for g in l]
                     if flat:
                         # avg_island_len = sum(flat)/len(flat)
                         # print(protocol, params)
-                        e_size = get_e_size(flat, L, nr_exp)
+                        e_size = get_e_size(flat, args.L, args.nr_exp)
                     # else:
                         # avg_island_len = 0
                     res = [
                         round(100*results[protocol][params]["m"]/results[protocol][params]["mp"], 1),
-                        100*results[protocol][params]["sc"]/(L*nr_exp),
-                        100*results[protocol][params]["mc"]/(L*nr_exp),
+                        100*results[protocol][params]["sc"]/(args.L*args.nr_exp),
+                        100*results[protocol][params]["mc"]/(args.L*args.nr_exp),
                         e_size
                     ]
-                    print(protocol, params, " & ".join([str(round(r, 1)) for r in res]))
+                    print(protocol, " & ", params, " & ", " & ".join([str(round(r, 1)) for r in res]), " & ", mut_freq)
 
     # print(results)
 
-    # # random mutation mositions
+    # # random mutation positions
     # for mut_freq in [0.01, 0.05, 0.1]:
     #     for exp_id in range(10):
     #         seq1 = "".join([random.choice("ACGT") for i in range(L)])
@@ -563,16 +716,44 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Calc identity", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    # parser.add_argument('--fasta', type=str,  default=False, help='Path to consensus fastq file(s)')
-    # parser.add_argument('--k', type=int, default=13, help='Kmer size')
-    # parser.add_argument('--w', type=int, default=20, help='Window size')
-    parser.add_argument('--outfolder', type=str,  default=None, help='A fasta file with transcripts that are shared between samples and have perfect illumina support.')
-    # parser.add_argument('--pickled_subreads', type=str, help='Path to an already parsed subreads file in pickle format')
-    # parser.set_defaults(which='main')
+    parser.add_argument('--L', type=int, default=10000, help='Length of simulated sequences')
+    parser.add_argument('--nr_exp', type=int, default=1000, help='Number of simulated experiments')
+    parser.add_argument('--experiment_type', type=str, default="all", help='experiment type choose between "all", "controlled or "only_subs"')
+    parser.add_argument('--mut_freqs', type=list, default=[0.01, 0.05, 0.10], help='mutation frequencies [0,1]')
+    parser.add_argument('--k_size', type=int, default=30, help='k-mer/strobemer length')
+    parser.add_argument('--w', type=int, default=20, help='number of hashes used in a sliding window for thinning (w=1 means no thinning)')
+    parser.add_argument('--orders', type=list, default=[2, ], help='List with orders of strobes to be analzyed')
+    parser.add_argument('--w_low', type=int, default=25, help='minimum window offset to the previous window (wMin > 0)')
+    parser.add_argument('--w_high', type=int, default=50, help='maximum window offset to the previous window (wMin <= wMax)')
+    parser.add_argument('--strobe_fractions', type=list, default=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9], help='Fraction of sampled strobemers, rest kmers')
+    parser.add_argument('--all_methods', action="store_true", help='perform matching analysis on simulated data for all (mixed-)strobemer and (mixed-)altstrobe seeding techniques')
+    parser.add_argument('--method', type=str, default="none", help='choose seeding technique')
+    parser.add_argument('--altstrobes_generalized', action="store_true", help='perform matching analysis on simulated data for altstrobes of all combinations from (1,k-1) to (k/2,k/2)')
+    parser.add_argument('--k_boundary', type=int, default=5, help='minimum strobe length (k >= 4 recommended to ensure uniqueness)')
+    parser.add_argument('--mixedstrobes', action="store_true", help='perform matching analysis on simulated data for user defined mixed seeding techniques')
+    parser.add_argument('--mixedstrobes_methods', type=list, default=["hybridstrobes", "altstrobes"], help='List with two seeding methods to sample mixedstrobes')
     args = parser.parse_args()
 
-    # if len(sys.argv)==1:
-    #     parser.print_help()
-    #     sys.exit()
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit()
+
+    methods = (
+        "kmers", "spaced_kmers_dense", "spaced_kmers_sparse",
+        "minstrobes", "randstrobes", "hybridstrobes", "altstrobes",
+        "mixedminstrobes", "mixedrandstrobes", "mixedhybridstrobes", "mixedaltstrobes")
+
+    if args.altstrobes_generalized:
+        args.methods = ("altstrobes_generalized",)
+        args.strobe_lengths = [(k1, args.k_size-k1) for k1 in range(1, int(args.k_size/2)+1)]
+    elif args.mixedstrobes:
+        args.methods = ("mixedstrobes",)
+        args.method1 = args.mixedstrobes_methods[0]
+        args.method2 = args.mixedstrobes_methods[1]
+    elif args.method != "none":
+        assert args.method in methods, "[Error] Seeding technique not implemented"
+        args.methods = (args.method,)
+    else:
+        args.methods = methods
 
     main(args)

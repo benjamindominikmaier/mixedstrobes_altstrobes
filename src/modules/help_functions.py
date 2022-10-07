@@ -3,6 +3,11 @@
     from https://github.com/lh3/readfq/blob/master/readfq.py
 '''
 
+
+def Test(a):
+    return hash(a)
+
+
 def readfq(fp): # this is a generator function
     last = None # this is a buffer keeping the last unprocessed line
     while True: # mimic closure; is it a bad idea?
