@@ -422,4 +422,192 @@ def compute_entropy_Xj(args, outfile):
         P( X_j | X_i ) = Probability that position j are covered by the seed if i is covered
         Let c_i be the coordinate within the seed that covers i.
 
-        P( X_j ) &= \sum_{c = 0}^{k-1} \sum_{
+        P( X_j ) &= \sum_{c = 0}^{k-1} \sum_{m = 1}^M P( X_j | Y_m, c) P(Y_m, c) \\
+                       &=  \sum_{c = 0}^{k-1} \sum_{m = 1}^M P( X_j | Y_m, c)  P( Y_m | c) P(c) \\
+                      &=   \frac{1}{k} \sum_{c_i = 0}^{k-1} \sum_{m = 1}^M P( X_j | Y_m, c)  P( Y_m | c).
+
+
+        Above holds for k-mers, altstrobes and randstrobes. For mixedstrobes we need to condition on seed type. We have
+        P( X_j | X_i ) = \sum_{c_i =1}^{30} sum_{k_i \in k_s,k_l} sum_{t \in k-mer, strobemer} P( X_j | X_i, c_i, k_i, t) * P(c_i, k_i, t) = 
+                         \sum_{c_i =1}^{30} sum_{k_i \in k_s,k_l} sum_{t \in k-mer, strobemer} P( X_j | X_i, c_i, k_i, t) * P(c_i | k_i, t) * P(k_i, t)               =
+                         \sum_{c_i =1}^{30} sum_{k_i \in k_s,k_l} sum_{t \in k-mer, strobemer} P( X_j | X_i, c_i, k_i, t) * P(c_i | k_i, t) * P(k_i | t)       * p(t) =
+                         \sum_{c_i =1}^{30} sum_{k_i \in k_s,k_l} sum_{t \in k-mer, strobemer} P( X_j | X_i, c_i, k_i, t) * (1/k_i)         * (k_i/(k_s + k_l) * p(t) =
+                         \sum_{c_i =1}^{30} sum_{k_i \in k_s,k_l} sum_{t \in k-mer, strobemer} P( X_j | X_i, c_i, k_i, t) * (1/(k_s + k_l) * p(t)
+
+        From above, we can compute the entropy of X_j | X_i exactly.
+        However, for X = \sum_{j=0}^{|S|} = \sum_{j=i-W-k}^{i+W+k} = X_j there is no feasable calculation. And furthermore, the X_j are not independent and exactly k  X_j can be 1 at a time.
+        We rely on the following approximation: https://math.stackexchange.com/questions/2680787/entropy-of-a-binary-random-vector-with-exactly-k-non-zeros
+
+    """
+
+
+    k = args.k
+    w_min = args.w_min
+    w_max = args.w_max
+    W = w_max
+
+
+    # Theoretical optimum
+    X = [ k/(w_max + k//2) ] * (w_max + k//2) # maximum length of a fuzzy seed in this analysis
+    print('Optimum:', [round(x, 3) for x in X])
+    X2 = [ 0.5 ] * (w_max + k//2) # maximum length of a fuzzy seed in this analysis
+
+
+    # approx from https://math.stackexchange.com/questions/2680787/entropy-of-a-binary-random-vector-with-exactly-k-non-zeros
+    # basically, entropy of X can be approximated by entropy of each individual X_i with a small correction factor. We have slightly different scenario though
+    sum_hx = 0
+    sum_hx2 = 0
+    for i in range(0, len(X)):
+        if X[i] > 0 and (1- X[i]) > 0:
+            sum_hx += X[i]* math.log(X[i],2) + (1- X[i]) * math.log((1- X[i]),2)
+            sum_hx2 += X2[i]* math.log(X2[i],2) + (1- X2[i]) * math.log((1- X2[i]),2)
+    
+    H_X_optimum  = -sum_hx
+    H_X_optimum2  = -sum_hx2
+    
+    print("Optimal entropy: {0}".format( H_X_optimum ) )
+    print("Optimal entropy general (no restrct on k): {0}".format( H_X_optimum2 ) )
+    for k_s in range(1, k+1):
+        outfile.write("{0},{1},{2},{3},{4},{5},{6},{7},{8}\n".format(w_min, w_max, 'Optimal', k_s, '-', H_X_optimum, '-', 'altstrobes-analysis', 'Entropy'))
+
+    X = [0]* (w_max + k//2) # maximum length of a fuzzy seed in this analysis
+    
+    # k-mers
+    j = w_max + k
+    for j in range(1, len(X)):
+        p_Xj = 0
+        for c_i in range(1,k+1):
+            # print(j, c_i, P_X_j_given_X_i_and_c_i_NEW(j, c_i, 0, k, w_min, w_max, k_prime = 'k_l'))
+            p_Xj += P_X_j_given_X_i_and_c_i_NEW(j, c_i, k, 0, w_min, w_max) * (1/(k)) # c_i is on k-mer
+            #p_Xj += P_X_j_given_X_i_and_c_i_NEW(j, c_i, 0, k, w_min, w_max, k_prime = 'k_s') * (1/(k)) # c_i is on short strobe
+        X[j-1] = p_Xj # because 1-indexed
+
+    print('K-mers:', [round(x, 3) for x in X])
+
+    # approx from https://math.stackexchange.com/questions/2680787/entropy-of-a-binary-random-vector-with-exactly-k-non-zeros
+    # basically, entropy of X can be approximated by entropy of each individual X_i with a small correction factor. We have slightly different scenario though
+    sum_hx = 0
+    for i in range(0, len(X)):
+        if X[i] > 0 and (1- X[i]) > 0:
+            sum_hx += X[i]* math.log(X[i],2) + (1- X[i]) * math.log((1- X[i]),2)
+    
+    H_X_kmers  = -sum_hx
+    
+    print("k-mers entropy: {0}".format( H_X_kmers ) )
+    outfile.write("{0},{1},{2},{3},{4},{5},{6},{7},{8}\n".format(w_min, w_max, 'k-mers', k, '-', H_X_kmers, '-', 'altstrobes-analysis', 'Entropy'))
+
+
+    # Altstrobes
+    print("ALTSTROBES")
+    X = [0]* (w_max + k//2) # maximum length of a fuzzy seed in this analysis
+    for s in range(1, k//2+1):
+        k_s = s
+        k_l = k-s
+        sum_hx = 0
+        #print(s, w_min_short, w_max_short, w_min_long, w_max_long, (w_max_short - w_min_short), (w_max_long - w_min_long))
+        for j in range(1, len(X)):
+            p_Xj = 0
+            for c_i in range(1,k+1):
+                # print(j, c_i, P_X_j_given_X_i_and_c_i_NEW(j, c_i, 0, k, w_min, w_max, k_prime = 'k_l'))
+                # p_Xj += P_X_j_given_X_i_and_c_i_NEW(j, c_i, k_s, k_l, w_min_short, w_max_short, k_prime = 'k_l') * (1/(k)) # c_i is on long strobe
+                # p_Xj += P_X_j_given_X_i_and_c_i_NEW(j, c_i, k_s, k_l, w_min_long, w_max_long, k_prime = 'k_s') * (1/(k)) # c_i is on short strobe
+                p_Xj += 0.5*P_X_j_given_X_i_and_c_i_NEW(j, c_i, k_s, k_l, w_min, w_max) * (1/k)
+                p_Xj += 0.5*P_X_j_given_X_i_and_c_i_NEW(j, c_i, k_l, k_s, w_min, w_max) * (1/k)
+                # p_Xj += 0.5 * P_X_j_given_X_i_and_c_i_NEW(j, c_i, k_s, k_l, w_min_short, w_max_short) * (1/(k)) # first strobe is short
+                # p_Xj += 0.5 * P_X_j_given_X_i_and_c_i_NEW(j, c_i, k_l, k_s, w_min_long, w_max_long) * (1/(k)) # first strobe is long
+            X[j-1] = p_Xj # because 1-indexed
+
+        print('Altstrobes:' , [round(x, 3) for x in X])
+        #print('0-positions:' , [i for i, x in enumerate(X) if x == 0])
+        #sys.exit()
+        
+        sum_hx = 0
+        for i in range(0, len(X)):
+            if X[i] > 0 and (1- X[i]) > 0:
+                sum_hx += X[i]* math.log(X[i],2) + (1- X[i]) * math.log((1- X[i]),2)
+
+        H_X_altstrobes  = -sum_hx
+        
+        print("Altstrobes Entropy: {0}, ({1},{2})".format( H_X_altstrobes, k_s, k_l) )
+        print()
+        if k_s == k_l:
+            outfile.write("{0},{1},{2},{3},{4},{5},{6},{7},{8}\n".format(w_min, w_max, 'randstrobes', k_s, '-', H_X_altstrobes, '-', 'altstrobes-analysis', 'Entropy'))
+        else:
+            outfile.write("{0},{1},{2},{3},{4},{5},{6},{7},{8}\n".format(w_min, w_max, 'altstrobes', k_s, '-', H_X_altstrobes, '-', 'altstrobes-analysis', 'Entropy'))
+
+
+    # Mixedstrobes
+    X = [0]* (w_max + k//2) # maximum length of a fuzzy seed in this analysis
+    for f in range(0, 11):
+        p_strobe = f/10
+        H_X = 0
+        k_s = k//2
+        k_l = k//2
+        for j in range(1, len(X)):
+            p_Xj = 0
+            for c_i in range(1,k+1):
+                for t in ['kmer', 'strobemer']:
+                    if t == 'kmer':
+                        # p_Xj += P_X_j_given_X_i_and_c_i_NEW(j, c_i, 0, k, w_min, w_max, k_prime = 'k_l') * (1/k) * (1-p_strobe) # c_i is on long strobe
+                        # p_Xj += P_X_j_given_X_i_and_c_i_NEW(j, c_i, 0, k, w_min, w_max, k_prime = 'k_s') * (1/k) * (1-p_strobe) # c_i is on short strobe
+                        p_Xj += (1-p_strobe) * P_X_j_given_X_i_and_c_i_NEW(j, c_i, 0, k, w_min, w_max) * (1/k) # c_i is on k-mer
+                    else:
+                        # p_Xj += P_X_j_given_X_i_and_c_i_NEW(j, c_i, k_s, k_l, w_min, w_max, k_prime = 'k_l') * (1/(k)) * p_strobe # c_i is on long strobe
+                        # p_Xj += P_X_j_given_X_i_and_c_i_NEW(j, c_i, k_s, k_l, w_min, w_max, k_prime = 'k_s') * (1/(k)) * p_strobe # c_i is on short strobe
+                        p_Xj +=  p_strobe * P_X_j_given_X_i_and_c_i_NEW(j, c_i, k_s, k_l, w_min, w_max) * (1/(k))
+
+            X[j-1] = p_Xj # because 1-indexed
+
+        print('Mixedstrobes:' , [round(x, 3) for x in X])
+        
+        sum_hx = 0
+        for i in range(0, len(X)):
+            if X[i] > 0 and (1- X[i]) > 0:
+                sum_hx += X[i]* math.log(X[i],2) + (1- X[i]) * math.log((1- X[i]),2)
+
+        H_X_mixedstrobes  = -sum_hx
+        
+        print("Mixedstrobes Entropy: {0}, (frac:{1})".format( H_X_mixedstrobes, p_strobe) )
+        print()
+
+        if p_strobe == 0:
+            outfile.write("{0},{1},{2},{3},{4},{5},{6},{7},{8}\n".format(w_min, w_max, 'k-mers', p_strobe, '-', H_X_mixedstrobes, '-', 'mixedstrobes-analysis', 'Entropy'))
+        elif p_strobe == 1.0:
+            outfile.write("{0},{1},{2},{3},{4},{5},{6},{7},{8}\n".format(w_min, w_max, 'randstrobes', p_strobe, '-', H_X_mixedstrobes, '-', 'mixedstrobes-analysis', 'Entropy'))
+        else:
+            outfile.write("{0},{1},{2},{3},{4},{5},{6},{7},{8}\n".format(w_min, w_max, 'mixedstrobes', p_strobe, '-', H_X_mixedstrobes, '-', 'mixedstrobes-analysis', 'Entropy'))
+
+
+
+def main(args):
+    outfile = open(args.outcsv, 'w')
+    outfile.write("w_min,w_max,type,x,m,y,mean_error_y_est,analysis,ymetric\n") # ymetric either p_match, E_overlap_theory, E_overlap_real_hash, Entropy
+    print('Using N_SIM:', args.N_SIM)
+    compute_entropy_Xj(args, outfile)
+    compute_p_match(args, args.N_SIM, outfile)
+    outfile.close()
+    plot_p_match(args, outfile.name, args.outplot_prefix)
+    plot_entropy(args, outfile.name, args.outplot_prefix)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Calc identity", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    # parser.add_argument('--fasta', type=str,  default=False, help='Path to consensus fastq file(s)')
+    parser.add_argument('k', type=int, default=15, help='k-mer size')
+    parser.add_argument('w_min', type=int, default=25, help='Window size')
+    parser.add_argument('w_max', type=int, default=50, help='Window size')
+    # parser.add_argument('f', type=str, default="2/3", help='relative size between strobes within strobemer')
+    parser.add_argument('outcsv', type=str,  default=None, help='output CSV file for plotting.')
+    parser.add_argument('outplot_prefix', type=str,  default=None, help='output pdf file prefix.')
+    parser.add_argument('--N_SIM', type=int, default=1000, help='Number of simulations for p_matches experiment')
+
+    # parser.set_defaults(which='main')
+    args = parser.parse_args()
+
+
+
+    # if len(sys.argv)==1:
+    #     parser.print_help()
+    #     sys.exit()
+
+    main(args)

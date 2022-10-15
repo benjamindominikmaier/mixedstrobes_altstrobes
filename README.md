@@ -101,7 +101,7 @@ StrobeMap -k 30 -n 3 -v 31 -w 60 -c randstrobes -o mapped.tsv  ref.fa query.fa
 
 ## Output
 
-The output is a file `matches.tsv` in the output folder. You can se a custom outfile name with the parameter `--prefix`.
+The output is a file `matches.tsv` in the output folder. You can set a custom outfile name with the parameter `--prefix`.
 Output format is a tab separated file on the same format as MUMmer, with identical fields except the last one which is approximate reference sequence match length instead of what MUMmer produce:
 
 ```
@@ -129,8 +129,280 @@ All default minimap2 settings can be found in the original minimap implementatio
 
 Are found in the `src` folder. Run instructions provided below
 
-TBD
+## matching_analysis_simulated.py
 
+The script is used to compute the matching metrics (fraction of matches, the sequence coverage, the match coverage and the expected island size as definied in Sahlin 2021) of simulated sequences with various mutation rates and all strobemer methods.
+
+When running the script without specifying any parameters (as in Maier & Sahlin, 2022), 1000 random DNA sequences (`--nr_exp`) of length 10,000nt (`--nr_exp`) are generated and subsequently mutated with mutation frequencies of 0.01, 0.05 and 0.1 ($--mut_freqs$) and equal chance for insertions, deletions and substitutions (see `--experiment_type`) to obtain corresponding query sequences. In the default mode, the sequences are seeded with all available methods (`kmers", "spaced_kmers_dense", "spaced_kmers_sparse", "minstrobes", "randstrobes", "hybridstrobes", "altstrobes", "mixedminstrobes", "mixedrandstrobes", "mixedhybridstrobes", "mixedaltstrobes`) and strobemer settings (2,15,25,50) (see `--k_size, --w, --orders, --w_low, --w_high`). By default, mixedstrobes are analyzed with strobe fractions ranging from 0.1 to 0.9, which can be changed using `--strobe_fractions`.
+
+However, it is also possible to specify only one seeding technique using the `--method` parameter or sample generalized_altstrobes using `--altstrobes_generalized`. When sampling generalized altstrobes, the matching analysis is performed for altstrobes of all combinations from (1,k-1) to (k/2,k/2), whereby a lower boundary can be specified using `--k_boundary`, which is recommended as altstrobes with `k_s < 5` cause uniqueness issues and thus bad performance. Additionally, we implemented the possibility to sample e.g. strobemer-strobemer combinations using the `--mixedstrobes` parameter, which allows to sample a mix of any two techniques with distributions given by `--strobe_fractions`.
+
+### Usage 
+
+```
+usage: matching_analysis_simulated.py [-h] [--L L] [--nr_exp NR_EXP] [--experiment_type EXPERIMENT_TYPE] [--mut_freqs MUT_FREQS] [--k_size K_SIZE] [--w W] [--orders ORDERS] [--w_low W_LOW]
+                                      [--w_high W_HIGH] [--strobe_fractions STROBE_FRACTIONS] [--all_methods] [--method METHOD] [--altstrobes_generalized] [--k_boundary K_BOUNDARY] [--mixedstrobes]
+                                      [--mixedstrobes_methods MIXEDSTROBES_METHODS]
+
+Calc identity
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --L L                 Length of simulated sequences (default: 10000)
+  --nr_exp NR_EXP       Number of simulated experiments (default: 1000)
+  --experiment_type EXPERIMENT_TYPE
+                        experiment type choose between "all", "controlled or "only_subs" (default: all)
+  --mut_freqs MUT_FREQS
+                        mutation frequencies [0,1] (default: [0.01, 0.05, 0.1])
+  --k_size K_SIZE       k-mer/strobemer length (default: 30)
+  --w W                 number of hashes used in a sliding window for thinning (w=1 means no thinning) (default: 20)
+  --orders ORDERS       List with orders of strobes to be analzyed (default: [2])
+  --w_low W_LOW         minimum window offset to the previous window (wMin > 0) (default: 25)
+  --w_high W_HIGH       maximum window offset to the previous window (wMin <= wMax) (default: 50)
+  --strobe_fractions STROBE_FRACTIONS
+                        Fraction of sampled strobemers, rest kmers (default: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+  --all_methods         perform matching analysis on simulated data for all (mixed-)strobemer and (mixed-)altstrobe seeding techniques (default: False)
+  --method METHOD       choose seeding technique (default: none)
+  --altstrobes_generalized
+                        perform matching analysis on simulated data for altstrobes of all combinations from (1,k-1) to (k/2,k/2) (default: False)
+  --k_boundary K_BOUNDARY
+                        minimum strobe length (k >= 4 recommended to ensure uniqueness) (default: 5)
+  --mixedstrobes        perform matching analysis on simulated data for user defined mixed seeding techniques (default: False)
+  --mixedstrobes_methods MIXEDSTROBES_METHODS
+                        List with two seeding methods to sample mixedstrobes (default: ['randstrobes', 'kmers'])
+```
+
+### Output
+
+The output format is as follows:
+```
+Method & Setting & Fraction of Matches & Sequence Coverage & Match Coverage & Expected Island Size & Mutation Frequency, e.g.
+minstrobes  &  (2, 15, 25, 50)  &  67.0 & 75.7 & 96.2 & 2.1  &  0.01
+```
+
+## matching_analysis_bio
+
+The script is used to compute the matching metrics (as definied in Sahlin 2021) of biological sequences for all strobemer methods. The query sequences (`--queries`) are split up in 
+disjoint segments of length (`--segment`) and mapped to the reference (`--references`) before the collinear chain solution of raw unmerged hits is determined for each segment and the matching metrics computed from it. The collinear chain solution takes only the longest collinear chain of hits into account, thus assuming the most likely location and avoiding to overcount "spurious" hits (see Sahlin, 2021). Details on implementation are found in [bioRxiv LINK TBD](XXX) Supplementary Section S4.
+
+### Usage
+```
+usage: matching_analysis_bio.py [-h] [--queries QUERIES] [--references REFERENCES] [--k K] [--strobe_w_min_offset STROBE_W_MIN_OFFSET] [--strobe_w_max_offset STROBE_W_MAX_OFFSET] [--w W] [--n N] [--strobe_fraction STROBE_FRACTION] [--dont_merge_matches] [--outfolder OUTFOLDER] [--prefix PREFIX] [--kmer_index] [--minstrobe_index] [--randstrobe_index] [--hybridstrobe_index] [--altstrobe_index] [--mixedminstrobe_index] [--mixedrandstrobe_index] [--mixedhybridstrobe_index] [--mixedaltstrobe_index] [--segment SEGMENT] [--selfalign] [--rev_comp]
+
+Calc identity
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --queries QUERIES     Path to query fasta or fastq file (default: False)
+  --references REFERENCES
+                        Path to reference fasta or fastq file (default: False)
+  --k K                 Length of kmer/all strobes combined (default: 15)
+  --strobe_w_min_offset STROBE_W_MIN_OFFSET
+                        Strobemer window start offset from first k-mer. If kmer start at pos i, first window will start at i+strobe_w_min_offset. Default: 20nt donwstream from start of first kmer.
+                        (default: 20)
+  --strobe_w_max_offset STROBE_W_MAX_OFFSET
+                        Strobemer window end. If kmer start at pos i, first window will stop at i+strobe_w_max_offset. Default: 70nt donwstream from start of first kmer. (default: 70)
+  --w W                 Thinning window size applied to reference sequences (default = 1, i.e., no thinning) (default: 1)
+  --n N                 Order on strobes (default: 2)
+  --strobe_fraction STROBE_FRACTION
+                        Fraction of sampled strobemers, rest kmers (default: 1)
+  --outfolder OUTFOLDER
+                        Folder to output TSV match file. (default: output_matching_analysis_bio)
+  --prefix PREFIX       Filename prefix (default "matches"). (default: matches)
+  --kmer_index          Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for k-mers (default: False)
+  --minstrobe_index     Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for minstrobes (default: False)
+  --randstrobe_index    Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for randstrobes (default: False)
+  --hybridstrobe_index  Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for hybridstrobes (default: False)
+  --altstrobe_index     Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for altstrobes (default: False)
+  --mixedminstrobe_index
+                        Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for mixed minstrobes/kmers based on
+                        --strobe_fraction (default: False)
+  --mixedrandstrobe_index
+                        Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for mixed randstrobes/kmers based on
+                        --strobe_fraction (default: False)
+  --mixedhybridstrobe_index
+                        Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for mixed hybridstrobes/kmers based on
+                        --strobe_fraction (default: False)
+  --mixedaltstrobe_index
+                        Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for mixed altstrobes/kmers based on
+                        --strobe_fraction (default: False)
+  --segment SEGMENT     segment length for computing the collinear chain solution of the raw hits (default: 2000)
+  --selfalign           Aligns sequences to itself (mainly used for bugfixing). Default is not align sequences to themselves if the same file is given as references and queries. (default: False)
+  --rev_comp            Match reverse complement of reads (output to separate file) (default: False)
+```
+### Output
+
+The script creates two output files, whereby one contains information about all segments from each query:
+```
+altstrobe.txt
+
+Query Number & Query Length & Segment Number & Segment Length & #Matches & Fraction of Matches & Sequence Coverage & Match Coverage & Expected Island Size & Collinear E-Size
+1 & 52197 & 1 & 2000 & 264 & 0.03 & 0.41 & 0.55 & 53.99 & 25.1
+1 & 52197 & 2 & 2000 & 318 & 0.02 & 0.43 & 0.6 & 52.98 & 21.0
+```
+
+and the second summary file contains the average matching metrics (weighted mean over all segments by segment length) for each of the queries:
+
+
+```
+altstrobe (summary).txt
+
+Query Number & Query Length & Fraction of Matches & Sequence Coverage & Match Coverage & Expected Island Size
+>Query 1 & 52197 & 2.5 & 38.4 & 52.5 & 147.1 & 555.8
+>Query 2 & 51992 & 3.4 & 51.4 & 70.3 & 35.8 & 747.5
+```
+
+## uniqueness_analysis
+
+This script computes the uniqueness of seeds and the expected number of hits (E-size) for either a given reference sequence or a simulated sequence. E-size is a measure of how repetitive the seeds in a query sequence are, on average, in a reference dataset; details on calculation are given in Sahlin, 2022.
+
+### Usage
+
+```
+usage: uniqueness_analysis.py [-h] [--fasta FASTA] [--kmers] [--minstrobes] [--mixedminstrobes] [--randstrobes] [--mixedrandstrobes] [--hybridstrobes] [--mixedhybridstrobes] [--spaced_dense]
+                              [--spaced_sparse] [--altstrobes] [--mixedaltstrobes] [--order ORDER] [--strobe_fraction STROBE_FRACTION] [--k_sizes K_SIZES [K_SIZES ...]] [--w W] [--w_low W_LOW]
+                              [--w_high W_HIGH] [--altstrobes_generalized ALTSTROBES_GENERALIZED] [--L L] [--nr_exp NR_EXP]
+
+Calc identity
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --fasta FASTA         Path to consensus fastq file(s) (default: False)
+  --kmers               Seeding k-mers (default: False)
+  --minstrobes          Seeding minstrobes (default: False)
+  --mixedminstrobes     Seeding mixedminstrobes (minstrobes/k-mers) with a user-defined --strobe_fraction (default: False)
+  --randstrobes         Seeding randstrobes (default: False)
+  --mixedrandstrobes    Seeding mixedrandstrobes (randstrobes/k-mers) with a user-defined --strobe_fraction (default: False)
+  --hybridstrobes       Seeding hybridstrobes (default: False)
+  --mixedhybridstrobes  Seeding mixedhybridstrobes (hybridstrobes/k-mers) with a user-defined --strobe_fraction (default: False)
+  --spaced_dense        Seeding spaced k-mers (dense) (default: False)
+  --spaced_sparse       Seeding spaced k-mers (sparse) (default: False)
+  --altstrobes          Kmer size (default: False)
+  --mixedaltstrobes     Kmer size (default: False)
+  --order ORDER         Order on strobes (default: 2)
+  --strobe_fraction STROBE_FRACTION
+                        Fraction of sampled strobemers, rest kmers (default: 1)
+  --k_sizes K_SIZES [K_SIZES ...], --nargs-int-type K_SIZES [K_SIZES ...]
+                        List with strobe lengths to be analyzed (default: [18, 24, 30, 36])
+  --w W                 number of hashes used in a sliding window for thinning (w=1 means no thinning) (default: 1)
+  --w_low W_LOW         minimum window offset to the previous window (wMin > 0) (default: 25)
+  --w_high W_HIGH       maximum window offset to the previous window (wMin <= wMax) (default: 50)
+  --altstrobes_generalized ALTSTROBES_GENERALIZED
+                        Choose k-size to seed altstrobes with strobe combinations from (1,k-1) to (k-1,1) (default: 0)
+  --L L                 Length of simulated sequences (only if no fasta file is provided) (default: 10000)
+  --nr_exp NR_EXP       Number of simulated experiments (only if no fasta file is provided) (default: 1)
+```
+
+### Output
+
+The output format is as follows:
+seeding_technique, k_size, accession_number (only for biological sequences), mean, median, lower_75, upper_75, percent_unique, ehits
+
+```
+python3 uniqueness_analysis.py --randstrobes
+
+Simulating sequence of length:  10000
+
+randstrobes2,18,,1.0,1,1,1,100.0,1.0
+randstrobes2,24,,1.0,1,1,1,100.0,1.0
+randstrobes2,30,,1.0,1,1,1,100.0,1.0
+randstrobes2,36,,1.0,1,1,1,100.0,1.0
+
+```
+
+## generate_seed
+
+This script samples $n$ reads (`nr_exp`) from a reference (`--reference`) and mutates them for the different experimental conditions (`--mut_freqs`). The sampled reads (unmutated and mutated) are saved to different output files (`--prefix`) in the outfolder (`--outfolder`). The reads are sampled from random positions of the reference and it is possible to specify whether sampled reads may contain unspecified nucleotides using `--tolerate_N`. In our analysis, this script is used to produce simulated reads for the minimap analysis (see next section).
+
+### Usage
+
+```
+usage: generate_seeds.py [-h] [--L L] [--nr_exp NR_EXP] [--experiment_type EXPERIMENT_TYPE] [--mut_freqs MUT_FREQS] [--reference REFERENCE] [--rev_comp] [--outfolder OUTFOLDER] [--prefix PREFIX] [--tolerate_N]
+
+Calc identity
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --L L                 Length of simulated sequences (default: 10000)
+  --nr_exp NR_EXP       Number of simulated experiments (default: 100000)
+  --experiment_type EXPERIMENT_TYPE
+                        experiment type choose between "all", "controlled or "only_subs" (default: all)
+  --mut_freqs MUT_FREQS
+                        mutation frequencies [0.01, 0.05, 0.1] (default: [0.01, 0.05, 0.1])
+  --reference REFERENCE
+                        path to fasta file with reference genome to generate reads from (default: None)
+  --rev_comp            Sampling reads from both strands (default: False)
+  --outfolder OUTFOLDER
+                        Folder to output FA read file. (default: ../output/simulated_reads)
+  --prefix PREFIX       Filename prefix (default "matches"). (default: reads)
+  --tolerate_N          Allow Ns in simulated reads (default: False)
+```
+
+### Output
+
+The output is a file `reads.txt` containing the unmutated sampled reads and multiple `reads_<mutation_frequency>_mutated.txt` files with the corresponding mutated reads in the output folder. You can set a custom outfile name with the parameter `--prefix`. Output format is fasta.
+
+## analyze_minimap
+
+This script takes a SAM output file from minimap2-strobemers (`--input_file`) and computes the fraction of correctly mapped reads (as defined by the existence of an overlap between query and reference position and right direction) and the average (mean) number of correctly mapped nucleotides. 
+
+### Usage
+
+```
+usage: analyze_minimap.py [-h] [--input_file INPUT_FILE] [--L L] [--N N]
+
+Calc identity
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --input_file INPUT_FILE
+                        Name of SAM output file from minimap2 (default: None)
+  --L L                 Length of each query read (default: 10000)
+  --N N                 Number of query reads (default: 100000)
+```
+
+### Output
+
+This script outputs the fraction of correctly mapped reads (1st line) and the average (mean) number of correctly mapped nucleotides (2nd line) as well as the number of incorrectly mapped reads on the forward strand, the number of incorrectly mapped reads on the reverse strand and the total number of mapped reads (3rd line) to the command line.
+
+```
+python3 analyze_minimap.py --input_file ../output/minimap/cmh13_kmers15_00.sam --L 10000 --N 100000
+
+0.99513
+9950.88829
+238 249 100000
+```
+
+## Stochasticity in Seed Construct (entropy_vs_p_one_seed-2022-09-07.py)
+
+This script performs simulations showing how stochasticity in seed construct influence probability of `w` consecutive seeds producing at least one match in a region of length `2w = 128` between sequences for various seed constructs.
+
+### Usage
+
+```
+usage: entropy_vs_p_one_seed-2022-09-07.py [-h] [--N_SIM N_SIM] k w_min w_max outcsv outplot_prefix
+
+Calc identity
+
+positional arguments:
+  k               k-mer size
+  w_min           Window size
+  w_max           Window size
+  outcsv          output CSV file for plotting.
+  outplot_prefix  output pdf file prefix.
+
+optional arguments:
+  -h, --help      show this help message and exit
+  --N_SIM N_SIM   Number of simulations for p_matches experiment (default: 1000)
+```
+
+### Output
+
+This script produces csv.files with the following columns: `w_min,w_max,type,x,m,y,mean_error_y_est,analysis,ymetric` as well as corresponding plots. The y-metric is either `p_match, E_overlap_theory, E_overlap_real_hash, Entropy`.
+
+## Figures in Maier & Sahlin, 2022
+
+All figures in Maier & Sahlin, 2022 can be generated running the R-notebook `figures.rmd`. All data tables as well as all figures used in this manuscript can be found in the output folder in this repository.
 
 CREDITS
 ----------------

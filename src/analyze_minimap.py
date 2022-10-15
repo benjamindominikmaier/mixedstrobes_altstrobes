@@ -33,7 +33,7 @@ def main(args):
                         else:
                             print("[Warning] Multiple mappings per query")
                     else:
-                        print("[Fwd]", line[0:4])
+                        # print("[Fwd]", line[0:4])
                         counter_fw += 1
                         if not nr in output_dict.keys():
                             output_dict[nr] = (0,0)
@@ -56,7 +56,7 @@ def main(args):
                         else:
                             print("[Warning] Multiple mappings per query")
                     else:
-                        print("[Rev]", line[0:4])
+                        # print("[Rev]", line[0:4])
                         counter_rev += 1
                         if not nr in output_dict.keys():
                             output_dict[nr] = (0,0)

@@ -732,8 +732,8 @@ def main(args):
         print("Processing query sequence #", n_query_sequences, "of length", len(full_seq))
         results = {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0, "coll": 0}
 
-        for segment in range(math.ceil(len(full_seq)/2000)):
-            seq = full_seq[segment*2000:segment*2000+2000]
+        for segment in range(math.ceil(len(full_seq)/args.segment)):
+            seq = full_seq[segment*args.segment:segment*args.segment+args.segment]
             tmp_outfile = open("tmp.tsv", 'w')
             if len(seq) > args.k + args.strobe_w_max_offset:
 
@@ -927,7 +927,7 @@ def main(args):
             results["coll"]
         ]
         outfile_summary.write(
-        ">Query " + str(n_query_sequences) + " & " + str(len(full_seq)) + " & " + " & ".join([str(round(r, 1)) for r in res])+"\n")
+        ">Query " + str(n_query_sequences+1) + " & " + str(len(full_seq)) + " & " + " & ".join([str(round(r, 1)) for r in res])+"\n")
     outfile.close()
     outfile_summary.close()
 
@@ -946,24 +946,25 @@ if __name__ == '__main__':
     parser.add_argument('--w', type=int, default=1, help='Thinning window size applied to reference sequences (default = 1, i.e., no thinning)')
     parser.add_argument('--n', type=int, default=2, help='Order on strobes')
     parser.add_argument('--strobe_fraction', type=float, default=1, help='Fraction of sampled strobemers, rest kmers')
-    parser.add_argument('--dont_merge_matches', action="store_true",  help='Do not merge matches with this option. It is seriously advised to\
-                                                                     merge matches as the files can become huge otherwise and fill up all diskspace.\
-                                                                     Do not specify this option unless you know what you are doing! Mostly here for\
-                                                                     development/bugchecking purposas. The default option is to merge matches if they\
-                                                                     are consectutive on both query and reference to create MAM-like matches \
-                                                                     (maximal approximate matches) of various lengths, much like the output of MUMmer. This is\
-                                                                     disk space frendilier, although these files can get large too.')
+    # parser.add_argument('--dont_merge_matches', action="store_true",  help='Do not merge matches with this option. It is seriously advised to\
+    #                                                                  merge matches as the files can become huge otherwise and fill up all diskspace.\
+    #                                                                  Do not specify this option unless you know what you are doing! Mostly here for\
+    #                                                                  development/bugchecking purposas. The default option is to merge matches if they\
+    #                                                                  are consectutive on both query and reference to create MAM-like matches \
+    #                                                                  (maximal approximate matches) of various lengths, much like the output of MUMmer. This is\
+    #                                                                  disk space frendilier, although these files can get large too.')
     parser.add_argument('--outfolder', type=str,  default="output_matching_analysis_bio", help='Folder to output TSV match file.')
     parser.add_argument('--prefix', type=str,  default="matches", help='Filename prefix (default "matches").')
-    parser.add_argument('--kmer_index', action="store_true",  help='Produce non-overlapping approximate matches for k-mers')
-    parser.add_argument('--minstrobe_index', action="store_true",  help='Produce non-overlapping approximate matches for minstrobes')
-    parser.add_argument('--randstrobe_index', action="store_true",  help='Produce non-overlapping approximate matches for randstrobes')
-    parser.add_argument('--hybridstrobe_index', action="store_true",  help='Produce non-overlapping approximate matches for hybridstrobes')
-    parser.add_argument('--altstrobe_index', action="store_true",  help='Produce non-overlapping approximate matches for altstrobes')
-    parser.add_argument('--mixedminstrobe_index', action="store_true",  help='Produce non-overlapping approximate matches for mixed minstrobes/kmers based on --strobe_fraction')
-    parser.add_argument('--mixedrandstrobe_index', action="store_true",  help='Produce non-overlapping approximate matches for mixed randstrobes/kmers based on --strobe_fraction')
-    parser.add_argument('--mixedhybridstrobe_index', action="store_true",  help='Produce non-overlapping approximate matches for mixed hybridstrobes/kmers based on --strobe_fraction')
-    parser.add_argument('--mixedaltstrobe_index', action="store_true",  help='Produce non-overlapping approximate matches for mixed altstrobes/kmers based on --strobe_fraction')
+    parser.add_argument('--kmer_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for k-mers')
+    parser.add_argument('--minstrobe_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for minstrobes')
+    parser.add_argument('--randstrobe_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for randstrobes')
+    parser.add_argument('--hybridstrobe_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for hybridstrobes')
+    parser.add_argument('--altstrobe_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for altstrobes')
+    parser.add_argument('--mixedminstrobe_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for mixed minstrobes/kmers based on --strobe_fraction')
+    parser.add_argument('--mixedrandstrobe_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for mixed randstrobes/kmers based on --strobe_fraction')
+    parser.add_argument('--mixedhybridstrobe_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for mixed hybridstrobes/kmers based on --strobe_fraction')
+    parser.add_argument('--mixedaltstrobe_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for mixed altstrobes/kmers based on --strobe_fraction')
+    parser.add_argument('--segment', type=int, default=2000, help='segment length for computing the collinear chain solution of the raw hits')
     parser.add_argument('--selfalign', action="store_true",  help='Aligns sequences to itself (mainly used for bugfixing). Default is not align\
                                                                     sequences to themselves if the same file is given as references and queries.')
     # parser.add_argument('--compress', type=str,  default=None, help='Compress output')

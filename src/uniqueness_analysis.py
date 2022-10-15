@@ -59,7 +59,7 @@ def compute_uniqueness(args, acc: str, seq: str, k_size: int, w_low: int,
         for i in range(len(seq) - k_size + 1):
             all_mers[hash(seq[i:i+k_size])] += 1
 
-    if args.spaced_dense:
+    elif args.spaced_dense:
         datastructure = "spaced_dense"
         span_size = k_size+k_size//2
         positions = set(random.sample(range(1, span_size - 1), k_size-2))
@@ -69,7 +69,7 @@ def compute_uniqueness(args, acc: str, seq: str, k_size: int, w_low: int,
         for s in indexing.spaced_kmers_iter(seq, k_size, span_size, positions):
             all_mers[s] += 1
 
-    if args.spaced_sparse:
+    elif args.spaced_sparse:
         datastructure = "spaced_sparse"
         span_size = 3*k_size
         positions = set(random.sample(range(1, span_size - 1), k_size-2))
@@ -126,6 +126,11 @@ def compute_uniqueness(args, acc: str, seq: str, k_size: int, w_low: int,
         for _, s in indexing.mixedaltstrobes_iter(seq, m_size1, m_size2, w_low, w_high, w, order, fraction, buffer_size=10000000):
             all_mers[s] += 1
 
+    else:
+        print("Please specify a valid seeding technique!\n\n")
+        parser.print_help()
+        sys.exit()
+
     print_stats(acc, datastructure, all_mers, k_size, total_mers)
 
 
@@ -149,14 +154,14 @@ def altstrobes_generalized_uniqueness(args):
             # if acc == "chr1" or acc == "chr2" or acc == "chr3":  # or acc == "chr4" or acc == "chr5":
             #if acc == "NC_000001.11" or acc == "NC_000002.12" or acc == "NC_000003.12":  # or acc == "chr4" or acc == "chr5":
             #    chr_dict = {"NC_000001.11": "chr1", "NC_000002.12": "chr2", "NC_000003.12": "chr3"}
-            if acc == "NC_000021.9":  # chr21
+            # if acc == "NC_000021.9":  # chr21
             # if acc == "NC_000001.11":  # chr1
-                for k1 in range(1, args.altstrobes_generalized+1):
-                    k_size = (k1, args.altstrobes_generalized-k1)
-                    datastructure = "altstrobes" + str(order) + str(k_size)
-                    for _, s in indexing.altstrobes_iter(seq, k_size[0], k_size[1], args.w_low, args.w_high, args.w, args.order, buffer_size=10000000):
-                        all_mers[s] += 1
-                    print_stats(acc, datastructure, all_mers, k_size, total_mers[acc])
+            for k1 in range(1, args.altstrobes_generalized+1):
+                k_size = (k1, args.altstrobes_generalized-k1)
+                datastructure = "altstrobes" + str(order) + str(k_size)
+                for _, s in indexing.altstrobes_iter(seq, k_size[0], k_size[1], args.w_low, args.w_high, args.w, args.order, buffer_size=10000000):
+                    all_mers[s] += 1
+                print_stats(acc, datastructure, all_mers, k_size, total_mers[acc])
     else:
         print("Simulating sequence of length: ", args.L)
         for exp_id in range(args.nr_exp):
@@ -192,9 +197,9 @@ def uniqueness(args):
                 # if acc == "chr1" or acc == "chr2" or acc == "chr3":  # or acc == "chr4" or acc == "chr5":
                 #if acc == "NC_000001.11" or acc == "NC_000002.12" or acc == "NC_000003.12":  # or acc == "chr4" or acc == "chr5":
                 #    chr_dict = {"NC_000001.11": "chr1", "NC_000002.12": "chr2", "NC_000003.12": "chr3"}
-                if acc == "NC_000021.9":  # chr21
+                # if acc == "NC_000021.9":  # chr21
                 # if acc == "NC_000001.11":  # chr1
-                    compute_uniqueness(args, acc, seq, k_size, args.w_low, args.w_high, args.w, total_mers[acc], args.order, args.strobe_fraction)
+                compute_uniqueness(args, acc, seq, k_size, args.w_low, args.w_high, args.w, total_mers[acc], args.order, args.strobe_fraction)
     else:
         print("Simulating sequence of length: ", args.L)
         for exp_id in range(args.nr_exp):
@@ -225,7 +230,7 @@ if __name__ == '__main__':
     parser.add_argument('--w_low', type=int, default=25, help="minimum window offset to the previous window (wMin > 0)")
     parser.add_argument('--w_high', type=int, default=50, help="maximum window offset to the previous window (wMin <= wMax)")
     parser.add_argument('--altstrobes_generalized', type=int, default=0, help='Choose k-size to seed altstrobes with strobe combinations from (1,k-1) to (k-1,1)')
-    parser.add_argument('--L', type=int, default=1000, help='Length of simulated sequences (only if no fasta file is provided)')
+    parser.add_argument('--L', type=int, default=10000, help='Length of simulated sequences (only if no fasta file is provided)')
     parser.add_argument('--nr_exp', type=int, default=1, help='Number of simulated experiments (only if no fasta file is provided)')
     args = parser.parse_args()
 

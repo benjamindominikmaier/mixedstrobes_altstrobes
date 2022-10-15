@@ -721,7 +721,7 @@ if __name__ == '__main__':
     parser.add_argument('--experiment_type', type=str, default="all", help='experiment type choose between "all", "controlled or "only_subs"')
     parser.add_argument('--mut_freqs', type=list, default=[0.01, 0.05, 0.10], help='mutation frequencies [0,1]')
     parser.add_argument('--k_size', type=int, default=30, help='k-mer/strobemer length')
-    parser.add_argument('--w', type=int, default=20, help='number of hashes used in a sliding window for thinning (w=1 means no thinning)')
+    parser.add_argument('--w', type=int, default=1, help='number of hashes used in a sliding window for thinning (w=1 means no thinning)')
     parser.add_argument('--orders', type=list, default=[2, ], help='List with orders of strobes to be analzyed')
     parser.add_argument('--w_low', type=int, default=25, help='minimum window offset to the previous window (wMin > 0)')
     parser.add_argument('--w_high', type=int, default=50, help='maximum window offset to the previous window (wMin <= wMax)')
@@ -731,7 +731,7 @@ if __name__ == '__main__':
     parser.add_argument('--altstrobes_generalized', action="store_true", help='perform matching analysis on simulated data for altstrobes of all combinations from (1,k-1) to (k/2,k/2)')
     parser.add_argument('--k_boundary', type=int, default=5, help='minimum strobe length (k >= 4 recommended to ensure uniqueness)')
     parser.add_argument('--mixedstrobes', action="store_true", help='perform matching analysis on simulated data for user defined mixed seeding techniques')
-    parser.add_argument('--mixedstrobes_methods', type=list, default=["hybridstrobes", "altstrobes"], help='List with two seeding methods to sample mixedstrobes')
+    parser.add_argument('--mixedstrobes_methods', type=list, default=["randstrobes", "kmers"], help='List with two seeding methods to sample mixedstrobes')
     args = parser.parse_args()
 
     if len(sys.argv) == 1:
