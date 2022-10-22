@@ -1,16 +1,16 @@
 Mixedstrobes/Altstrobes
 ===========
 
-This repository contains information, scripts, and sourcecode to run the analysis for various strobemers in Maier and Sahlin, 2022 [bioRxiv LINK TBD]. For info about strobemers, see [the repo](https://github.com/ksahlin/strobemers).
+This repository contains information, scripts, and sourcecode to run the analysis for various strobemers in Maier and Sahlin, 2022 [bioRxiv LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198v1). For info about strobemers, see [the repo](https://github.com/ksahlin/strobemers).
 
 
 ### What is a mixedstrobe?
 
-Mixedstrobes is a mixed seeding technique that samples either a $k$-mer or a strobemer at a specified fraction. They may be sampled with all three strobemers seeding techniques (minstrobes, hybridstrobes and randstrobes) as well as altstrobes. Analogous to strobemers, we parameterize mixedstrobes as $(n,\ell,w_{min}, w_{max}, q)$, where $n$ is the number of strobes $n$, $\ell$ is the strobe length, $w_{min}$ and $w_{max}$ the minimum and maximum downstream offset to last window, and $q$ the strobemer fraction. Details on construction are found in [bioRxiv LINK TBD](XXX)
+Mixedstrobes is a mixed seeding technique that samples either a $k$-mer or a strobemer at a specified fraction. They may be sampled with all three strobemers seeding techniques (minstrobes, hybridstrobes and randstrobes) as well as altstrobes. Analogous to strobemers, we parameterize mixedstrobes as $(n,\ell,w_{min}, w_{max}, q)$, where $n$ is the number of strobes $n$, $\ell$ is the strobe length, $w_{min}$ and $w_{max}$ the minimum and maximum downstream offset to last window, and $q$ the strobemer fraction. Details on construction are found in [bioRxiv LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198v1)
 
 ### What is an altstrobe?
 
-Altstrobes are modified randstrobes where the strobe length is alternating between shorter and longer strobes. Contrary to randstrobes, where all strobes are of equal size (e.g. $k/2$ for strobemers of order 2), altstrobes are build up of one short strobe $k_s$ one longer strobe $k_l$, with $|k_s| + |k_l| = k$. We parameterize altstrobes as $(n,|k_s|/|k_l|, w_{min}, w_{max})$. Details on constructions are found in [bioRxiv LINK TBD](XXX)
+Altstrobes are modified randstrobes where the strobe length is alternating between shorter and longer strobes. Contrary to randstrobes, where all strobes are of equal size (e.g. $k/2$ for strobemers of order 2), altstrobes are build up of one short strobe $k_s$ one longer strobe $k_l$, with $|k_s| + |k_l| = k$. We parameterize altstrobes as $(n,|k_s|/|k_l|, w_{min}, w_{max})$. Details on constructions are found in [bioRxiv LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198v1)
 
 ### This repository
 
@@ -20,7 +20,7 @@ The repository consists of
 - functions to generate strobemers in Python
 - a tool `StrobeMap` implemented in both C++ and Python
 - a modified version of 'minimap2' for strobemers
-- scripts used for the evaluations in the [paper LINK TBD](XXX)
+- scripts used for the evaluations in the [paper LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198v1)
 
 # C++ functions
 
@@ -40,10 +40,10 @@ The tool `StrobeMap_Maier` is a program which roughly has the same interface as 
 
 ## Installation
 
-`StrobeMap` (currently still without altstrobes and mixedstrobes) is available through [bioconda](https://bioconda.github.io/recipes/strobemap/README.html#package-strobemap). You can also acquire precompiled binaries for Linux from [here](https://github.com/benjamindominikmaier/mixedstrobes altstrobes/tree/main/src/strobemers_cpp/binaries). For example, for linux, simply do
+`StrobeMap` (currently still without altstrobes and mixedstrobes) is available through [bioconda](https://bioconda.github.io/recipes/strobemap/README.html#package-strobemap). You can also acquire precompiled binaries for Linux from [here](https://github.com/benjamindominikmaier/mixedstrobes_altstrobes/tree/main/src/cpp/binaries). For example, for linux, simply do
 
 ```
-wget /home/benji/Desktop/Altstrobe Mixedstrobe/src/cpp/StrobeMap/binaries/StrobeMap
+wget ./mixedstrobes_altstrobes/src/cpp/binaries/StrobeMap
 chmod +x StrobeMap-0.0.2
 ./StrobeMap-0.0.2  # test program
 ```
@@ -183,7 +183,7 @@ minstrobes  &  (2, 15, 25, 50)  &  67.0 & 75.7 & 96.2 & 2.1  &  0.01
 ## matching_analysis_bio
 
 The script is used to compute the matching metrics (as definied in Sahlin 2021) of biological sequences for all strobemer methods. The query sequences (`--queries`) are split up in 
-disjoint segments of length (`--segment`) and mapped to the reference (`--references`) before the collinear chain solution of raw unmerged hits is determined for each segment and the matching metrics computed from it. The collinear chain solution takes only the longest collinear chain of hits into account, thus assuming the most likely location and avoiding to overcount "spurious" hits (see Sahlin, 2021). Details on implementation are found in [bioRxiv LINK TBD](XXX) Supplementary Section S4.
+disjoint segments of length (`--segment`) and mapped to the reference (`--references`) before the collinear chain solution of raw unmerged hits is determined for each segment and the matching metrics computed from it. The collinear chain solution takes only the longest collinear chain of hits into account, thus assuming the most likely location and avoiding to overcount "spurious" hits (see Sahlin, 2021). Details on implementation are found in [bioRxiv LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198v1) Supplementary Section S4.
 
 ### Usage
 ```
@@ -407,4 +407,4 @@ All figures in Maier & Sahlin, 2022 can be generated running the R-notebook `fig
 CREDITS
 ----------------
 
-Benjamin D. Maier and Kristoffer Sahlin, Entropy predicts fuzzy-seed sensititivity, bioRxiv, October 2022; XXX
+Benjamin D. Maier and Kristoffer Sahlin, Entropy predicts fuzzy-seed sensititivity, bioRxiv, October 2022; https://www.biorxiv.org/content/10.1101/2022.10.13.512198v1
