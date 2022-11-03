@@ -1173,7 +1173,7 @@ def altstrobes(seq: str, k_size: int, strobe_w_min_offset: int,
     return altstrobes
 
 
-def altstrobes_iter(seq: str, k_size1: int, k_size2: int, strobe_w_min_offset: int,
+def altstrobes_iter(seq: str, k_size: int, strobe_w_min_offset: int,
                     strobe_w_max_offset: int, w: int, order: int = 2,
                     buffer_size: int = 10000000) -> Iterator[tuple]:
     """
@@ -1191,8 +1191,8 @@ def altstrobes_iter(seq: str, k_size1: int, k_size2: int, strobe_w_min_offset: i
     for i in range(0, len(seq), buffer_size):
         substring = seq[i:i+buffer_size]
         for p, m in altstrobes(
-                substring, k_size1, k_size2, strobe_w_min_offset, strobe_w_max_offset,
-                w, order=order).items():
+                substring, k_size, strobe_w_min_offset, strobe_w_max_offset,
+                w, order).items():
 
             yield p, m
 
@@ -1216,7 +1216,7 @@ def altstrobes_generalized(seq: str, k_size1: int, k_size2: int, strobe_w_min_of
     assert strobe_w_min_offset > 0, "Minimum strobemer offset has to be greater than 0 in this implementation"
     assert order == 2, "Altstrobes are just implemented for order 2"
 
-    altstrobes = {tuple(index): h for index, h, min_values in seq_to_altstrobes_generalized_iter(
+    altstrobes = {tuple(index): h for index, h, min_values in seq_to_altstrobes_iter(
         seq, k_size1, k_size2, strobe_w_min_offset, strobe_w_max_offset, prime, w, order, generalized=True, arg=arg
     )}
     return altstrobes
