@@ -1216,7 +1216,7 @@ def altstrobes_generalized(seq: str, k_size1: int, k_size2: int, strobe_w_min_of
     assert strobe_w_min_offset > 0, "Minimum strobemer offset has to be greater than 0 in this implementation"
     assert order == 2, "Altstrobes are just implemented for order 2"
 
-    altstrobes = {tuple(index): h for index, h, min_values in seq_to_altstrobes_iter(
+    altstrobes = {tuple(index): h for index, h in seq_to_altstrobes_iter(
         seq, k_size1, k_size2, strobe_w_min_offset, strobe_w_max_offset, prime, w, order, generalized=True, arg=arg
     )}
     return altstrobes
