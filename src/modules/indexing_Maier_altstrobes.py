@@ -368,7 +368,7 @@ def seq_to_randstrobes_iter(seq: str, k_size: int, strobe_w_min_offset: int,
         min_hash_val = hash_m1
         for index_order in range(1, order):
             min_index, min_value = argmin([
-                (min_hash_val + hash_seq_list[i][1]) % prime
+                (hash_m1 ^ hash_seq_list[i][1])
                 for i in range(*windows[index_order-1])
             ])
 
@@ -434,7 +434,7 @@ def seq_to_mixedrandstrobes_iter(seq: str, k_size: int, strobe_w_min_offset: int
             min_hash_val = hash_m1
             for index_order in range(1, order):
                 min_index, min_value = argmin([
-                    (min_hash_val + hash_seq_list[i][1]) % prime
+                    (hash_m1 ^ hash_seq_list[i][1])
                     for i in range(*windows[index_order-1])
                 ])
 
@@ -1585,7 +1585,7 @@ def sample_randstrobes(seq: str, hash_seq_list: list, p1: int, hash_m1: int,
     min_hash_val = hash_m1
     for index_order in range(1, order):
         min_index, min_value = argmin([
-            (min_hash_val + hash_seq_list[i][1]) % prime
+            (hash_m1 ^ hash_seq_list[i][1])
             for i in range(*windows[index_order-1])
         ])
 
