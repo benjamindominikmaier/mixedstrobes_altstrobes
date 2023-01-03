@@ -108,7 +108,7 @@ mers_vector construct_flat_vector_three_pos(three_pos_index &tmp_index, uint64_t
         }
         prev_k = curr_k;
     }
-
+    std::cout << "Unique Elements: " << unique_elements << std::endl; 
     return flat_vector;
 }
 
@@ -223,6 +223,23 @@ static inline void make_string_to_hashvalues2(std::string &seq, std::vector<uint
             l = 0, x = 0; // if there is an "N", restart
         }
     }
+}
+
+
+uint64_t make_string_to_hashvalue(const std::string &seq, int k, int start) {
+    uint64_t kmask=(1ULL<<2*k) - 1;
+    uint64_t x = 0;
+    for (int i = start; i < start+k; i++) {
+        int c = seq_nt4_table[(uint8_t) seq[i]];
+        if (c < 4) { // not an "N" base
+            x = (x << 2 | c) & kmask;
+            }
+        else {
+            return 0;
+        }
+    }
+    uint64_t hash_k = hash64(x, kmask);
+    return hash_k;
 }
 
 
@@ -1840,8 +1857,6 @@ mers_vector seq_to_mixedhybridstrobes3(int n, int k, int w_min, int w_max, int s
 
 
 
-
-
 mers_vector seq_to_hybridstrobes(int n, int k, int w_min, int w_max, std::string &seq, unsigned int ref_index)
 {
     mers_vector hybridstrobes;
@@ -2131,4 +2146,107 @@ mers_vector seq_to_mixedhybridstrobes(int n, int k, int w_min, int w_max, int st
 
     }
     return mixedhybridstrobes;
+}
+
+
+mers_vector seq_to_multistrobes2(int n, int k, int k_b, int w_min, int w_max, std::string &seq, unsigned int ref_index)
+{
+    mers_vector multistrobes2;
+
+    if (seq.length() < w_max) {
+        return multistrobes2;
+    }
+
+    std::transform(seq.begin(), seq.end(), seq.begin(), ::toupper);
+    uint64_t kmask=(1ULL<<2*k_b) - 1;
+    uint64_t q = pow (2, 16) - 1;
+//    std::bitset<64> x(q);
+//    std::cout << x << '\n';
+    // make string of strobes into hashvalues all at once to avoid repetitive k-mer to hash value computations
+    std::vector<uint64_t> string_hashes;
+    std::vector<uint64_t> string_hashes2;
+    std::vector<unsigned int> pos_to_seq_choord;
+    uint64_t hash_multistrobe2;
+//    robin_hood::unordered_map< unsigned int, unsigned int>  pos_to_seq_choord;
+    make_string_to_hashvalues2(seq, string_hashes, pos_to_seq_choord, k_b, kmask);
+    unsigned int seq_length = string_hashes.size();
+
+    if (string_hashes.size() == 0) {
+        return multistrobes2;
+    }
+//    std::cout << seq << std::endl;
+
+    // compute windows for all strobe length combinations
+    std::vector<uint64_t> lengths;
+    std::vector<uint64_t> w_mins;
+    std::vector<uint64_t> w_maxs;
+
+    for (unsigned int i = k_b; i < 2*k-k_b; i++){
+        lengths.push_back(i);
+        w_mins.push_back(w_min + i - k);
+        w_maxs.push_back(w_max + i - k);
+    }
+
+    unsigned int options = lengths.size();
+
+    // create the multistrobes
+    for (unsigned int i = 0; i <= seq_length; i++) {
+
+//        if ((i % 1000000) == 0 ){
+//            std::cout << i << " strobemers created." << std::endl;
+//        }
+        unsigned int strobe_pos_next;
+        uint64_t strobe_hashval_next;
+
+        uint64_t strobe_hash = string_hashes[i];
+        unsigned int option = strobe_hash % options;
+        unsigned int k1 = lengths[option]; // determine length of first strobe
+        unsigned int k2 = 2*k-k1; // determine length of second strobe
+        unsigned int w_start = i + w_mins[option];
+        strobe_hash = make_string_to_hashvalue(seq, k1, i);
+
+        if (i + w_max <= seq_length - 1){
+            unsigned int w_end = i + w_maxs[option];
+            get_next_strobe(string_hashes, strobe_hash, strobe_pos_next, strobe_hashval_next, w_start, w_end, q);
+        }
+        else if ((w_start + 1 < seq_length) && (seq_length <= i + w_maxs[option]) ){
+            unsigned int w_end = seq_length -1;
+            get_next_strobe(string_hashes, strobe_hash, strobe_pos_next, strobe_hashval_next, w_start, w_end, q);
+        }
+        else{
+            return multistrobes2;
+        }
+        
+        unsigned int seq_pos_strobe1 = pos_to_seq_choord[i];
+        unsigned int seq_pos_strobe2 = pos_to_seq_choord[strobe_pos_next];
+        unsigned int seq_pos_strobe3 = pos_to_seq_choord[strobe_pos_next + k2 - k_b];
+        strobe_hashval_next = make_string_to_hashvalue(seq, k2, seq_pos_strobe2);
+        hash_multistrobe2 = (strobe_hash/2) + (strobe_hashval_next/3);
+
+        /* if (k1 > k2){
+            uint64_t hash1 = strobe_hash & ((1 << 2*k) - 1);
+            uint64_t hash2 = (strobe_hashval_next << 2*k2) ^ (strobe_hash >> 2*k);
+            hash_multistrobe2 = (hash1 + hash2);
+        } 
+        else if (k2 > k1){
+            uint64_t hash1 = (strobe_hash << 2*k1) ^ (strobe_hashval_next >> 2*k);
+            uint64_t hash2 = strobe_hashval_next & ((1 << 2*k) - 1);
+            hash_multistrobe2 = (hash1 + hash2);
+        }
+        else{
+            // hash_multistrobe2 = (strobe_hash + strobe_hashval_next);
+            hash_multistrobe2 = ((strobe_hash/2) + (strobe_hashval_next/3);
+        } */
+
+        std::tuple<uint64_t, unsigned int, unsigned int, unsigned int, unsigned int> s (hash_multistrobe2, ref_index, seq_pos_strobe1, seq_pos_strobe3, seq_pos_strobe3);
+        multistrobes2.push_back(s);
+    }
+    return multistrobes2;
+}
+
+
+mers_vector seq_to_multistrobes(int n, int k, int k_b, int w_min, int w_max, std::string &seq, unsigned int ref_index)
+{
+    std::cout << "Multistrobes are just implemeted for order 2." << std::endl;
+    exit(0);
 }

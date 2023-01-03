@@ -163,3 +163,6 @@ python3 StrobeMap_Maier --queries ../data/GCF_003018135.1_ASM301813v1_genomic.fn
  --strobe_fraction 0.9
 python3 StrobeMap_Maier --queries ../data/GCF_003018135.1_ASM301813v1_genomic.fna --references ../data/GCF_003018575.1_ASM301857v1_genomic.fna --w 1 --k 10 --n 3 --strobe_w_min_offset 11 --strobe_w_max_offset 100 --mixedhybridstrobe_index --rev_comp --prefix mixedhybridstrobe3_0.9 --outfolder ../output/data\ tables/StrobeMap/
  --strobe_fraction 0.9
+ 
+# multistrobes
+python3 StrobeMap_Maier --queries ../data/GCF_003018135.1_ASM301813v1_genomic.fna --references ../data/GCF_003018575.1_ASM301857v1_genomic.fna --w 1 --k 10 --n 2 --strobe_w_min_offset 16 --strobe_w_max_offset 100 --multistrobe_index --rev_comp --prefix multistrobes2 --outfolder ../output/data\ tables/StrobeMap/

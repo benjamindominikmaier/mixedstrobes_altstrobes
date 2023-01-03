@@ -449,12 +449,13 @@ void print_usage() {
     std::cerr << "\t-n INT number of strobes [2]\n";
     std::cerr << "\t-k INT strobe length, limited to 32 [20]\n";
     std::cerr << "\t-k2 INT strobe length of second strobe for altstrobes only [2k]";
+    std::cerr << "\t-b INT minimum strobe length for multistrobes";
     std::cerr << "\t-v INT strobe w_min offset [k+1]\n";
     std::cerr << "\t-w INT strobe w_max offset [70]\n";
     std::cerr << "\t-f INT strobe_fraction [60]\n";
     std::cerr << "\t-t INT number of threads [3]\n";
     std::cerr << "\t-o name of output tsv-file [output.tsv]\n";
-    std::cerr << "\t-c Choice of protocol to use; kmers, minstrobes, hybridstrobes, randstrobes, altstrobes [randstrobes]. \n";
+    std::cerr << "\t-c Choice of protocol to use; kmers, minstrobes, hybridstrobes, randstrobes, altstrobes, multistrobes [randstrobes]. \n";
     std::cerr << "\t-C UINT Mask (do not process) strobemer hits with count larger than C [1000]\n";
     std::cerr << "\t-L UINT Print at most L NAMs per query [1000]. Will print the NAMs with highest score S = n_strobemer_hits * query_span. \n";
     std::cerr << "\t-S Sort output NAMs for each query based on score. Default is to sort first by ref ID, then by query coordinate, then by reference coordinate. \n";
@@ -481,6 +482,7 @@ int main (int argc, char *argv[])
     int n = 2;
     int k = 20;
     int k2 = 0;
+    int k_b = 0;
     int s = k - 4;
     float f = 0.0002;
     std::string output_file_name = "output.tsv";
@@ -511,6 +513,10 @@ int main (int argc, char *argv[])
                 flag = true;
             } else if (argv[opn][1] == 'k2') {
                 k2 = std::stoi(argv[opn + 1]);
+                opn += 2;
+                flag = true;
+            } else if (argv[opn][1] == 'b') {
+                k_b = std::stoi(argv[opn + 1]);
                 opn += 2;
                 flag = true;
             } else if (argv[opn][1] == 'o') {
@@ -588,6 +594,17 @@ int main (int argc, char *argv[])
         }  
     }
 
+    if (choice == "multistrobes"){
+        if (k_b == 0){
+            k_b = 5;
+            std::cout << "Minimum length of strobes not specified. Continuing with default value of 5!" << std::endl;
+         }
+        if (n % 2 == 1){
+            n = n - 1;
+            std::cout << "Number of strobes has to be even in this implementation. Number of strobes is changed to: " << n << std::endl;
+        } 
+    }
+
 
     if (!wmin_set){
         w_min = k+1; // Update default w_min to k +1 if user has specified non-default k and not set w_min parameter
@@ -599,6 +616,10 @@ int main (int argc, char *argv[])
     std::cout << "k: " << k << std::endl;
     if (choice == "altstrobes"){
         std::cout << "k2: " << k2 << std::endl;
+    }
+    if (choice == "multistrobes"){
+        std::cout << "k_boundary: " << k_b << std::endl;
+        std::cout << "k_total: " << k*n << std::endl;
     }
     std::cout << "-s: " << ultra_output << std::endl;
     std::cout << "w_min: " << w_min << std::endl;
@@ -616,6 +637,11 @@ int main (int argc, char *argv[])
     int filter_nams = 0;
 //    assert(k <= w_min && "k have to be smaller than w_min");
     assert(k <= 32 && "k have to be smaller than 32!");
+    if (choice == "multistrobes"){
+        assert(k_b > 4 && "You should really not use too small strobe boundary sizes! (multistrobes)");
+        k2 = k;
+        k = k_b;
+    }
     if (ultra_output){
         assert(output_specified && "If -s is specified -o needs to be specified on format: /my/path/to/uLTRA_output/ ");
     }
@@ -820,6 +846,22 @@ int main (int argc, char *argv[])
             }
         }
     }
+    else if (choice == "multistrobes"){
+            if (n == 2 ){
+            for (auto x: ref_seqs){
+                mers_vector multistrobes2; // pos, chr_id, kmer hash value
+                multistrobes2 = seq_to_multistrobes2(n, k2, k_b, w_min, w_max, x.second, x.first);
+                tmp_index[x.first] = multistrobes2;
+            }
+        }
+        else {
+            for (auto x: ref_seqs){
+                mers_vector multistrobes; // pos, chr_id, kmer hash value
+                multistrobes = seq_to_multistrobes(n, k2, k_b, w_min, w_max, x.second, x.first);
+                tmp_index[x.first] = multistrobes;
+            }
+        }
+    }
 
     else {
         std::cout << choice << "not implemented : " << std::endl;
@@ -969,6 +1011,18 @@ int main (int argc, char *argv[])
                         query_mers = seq_to_altstrobes(n, k, k2, w_min, w_max, record.seq, q_id);
                         seq_rc = reverse_complement(record.seq);
                         query_mers_rc = seq_to_altstrobes(n, k, k2, w_min, w_max, seq_rc, q_id);
+                    }
+                }
+                else if (choice == "multistrobes" ){
+                    if (n == 2 ){
+                        query_mers = seq_to_multistrobes2(n, k2, k_b, w_min, w_max, record.seq, q_id);
+                        seq_rc = reverse_complement(record.seq);
+                        query_mers_rc = seq_to_multistrobes2(n, k2, k_b, w_min, w_max, seq_rc, q_id);
+                    }
+                    else {
+                        query_mers = seq_to_multistrobes(n, k2, k_b, w_min, w_max, record.seq, q_id);
+                        seq_rc = reverse_complement(record.seq);
+                        query_mers_rc = seq_to_multistrobes(n, k2, k_b, w_min, w_max, seq_rc, q_id);
                     }
                 }
                 else if (choice == "minstrobes" ){
@@ -1146,6 +1200,18 @@ int main (int argc, char *argv[])
                         query_mers = seq_to_altstrobes(n, k, k2, w_min, w_max, record.seq, q_id);
                         seq_rc = reverse_complement(record.seq);
                         query_mers_rc = seq_to_altstrobes(n, k, k2, w_min, w_max, seq_rc, q_id);
+                    }
+                }
+                else if (choice == "multistrobes" ){
+                    if (n == 2 ){
+                        query_mers = seq_to_multistrobes2(n, k2, k_b, w_min, w_max, record.seq, q_id);
+                        seq_rc = reverse_complement(record.seq);
+                        query_mers_rc = seq_to_multistrobes2(n, k2, k_b, w_min, w_max, seq_rc, q_id);
+                    }
+                    else {
+                        query_mers = seq_to_multistrobes(n, k, k_b, w_min, w_max, record.seq, q_id);
+                        seq_rc = reverse_complement(record.seq);
+                        query_mers_rc = seq_to_multistrobes(n, k, k_b, w_min, w_max, seq_rc, q_id);
                     }
                 }
                 else if (choice == "minstrobes" ){
