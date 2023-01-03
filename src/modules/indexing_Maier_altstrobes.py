@@ -368,11 +368,11 @@ def seq_to_randstrobes_iter(seq: str, k_size: int, strobe_w_min_offset: int,
         min_hash_val = hash_m1
         for index_order in range(1, order):
             min_index, min_value = argmin([
-                (min_hash_val + hash_seq_list[i][1]) % prime
+                (hash_m1 ^ hash_seq_list[i][1])
                 for i in range(*windows[index_order-1])
             ])
 
-            min_hash_val = min_hash_val + (index_order * (-1)**index_order) * hash_seq_list[windows[index_order-1][0] + min_index][1]
+            min_hash_val = min_hash_val + ((index_order+1) * (-1)**index_order) * hash_seq_list[windows[index_order-1][0] + min_index][1]
             index.append(min_index+windows[index_order-1][0])
             min_values.append(min_value)
 
@@ -434,11 +434,11 @@ def seq_to_mixedrandstrobes_iter(seq: str, k_size: int, strobe_w_min_offset: int
             min_hash_val = hash_m1
             for index_order in range(1, order):
                 min_index, min_value = argmin([
-                    (min_hash_val + hash_seq_list[i][1]) % prime
+                    (hash_m1 ^ hash_seq_list[i][1])
                     for i in range(*windows[index_order-1])
                 ])
 
-                min_hash_val = min_hash_val + (index_order * (-1)**index_order) * hash_seq_list[windows[index_order-1][0] + min_index][1]
+                min_hash_val = min_hash_val + ((index_order+1) * (-1)**index_order) * hash_seq_list[windows[index_order-1][0] + min_index][1]
                 index.append(min_index+windows[index_order-1][0])
             yield index, min_hash_val
 
@@ -1013,7 +1013,7 @@ def mixedhybridstrobes_iter(seq: str, k_size: int, strobe_w_min_offset: int,
 
 def seq_to_altstrobes_iter(seq: str, k_size1: int, k_size2: int, strobe_w_min_offset: int,
                            strobe_w_max_offset: int, prime: int, w: int,
-                           order: int, generalized: bool=False, arg: int=0) -> Iterator[tuple]:
+                           order: int, generalized: bool=False, arg: int=50) -> Iterator[tuple]:
     """
     Iterator for creation of altstrobes of any order
 
@@ -1059,7 +1059,7 @@ def seq_to_altstrobes_iter(seq: str, k_size1: int, k_size2: int, strobe_w_min_of
         # hash_m1 = hash_seq_list[p]
         # print(p1)
 
-        if hash_m1 % 2 == arg: # decision about whether k1 or k2 should be seeded first
+        if hash_m1 % 100 < arg: # decision about whether k1 or k2 should be seeded first
             seed_k1 = False
             index = [p1, ] # -p1
             min_hash_val = hash_m1
@@ -1070,7 +1070,8 @@ def seq_to_altstrobes_iter(seq: str, k_size1: int, k_size2: int, strobe_w_min_of
                 index = [p1, p1]
             else:
                 index = [p1, p1+k_size1]
-            min_hash_val = hash_seq_list2[p1][1]
+            hash_m1 = hash_seq_list2[p1][1]
+            min_hash_val = hash_m1
             required_length = required_length2
 
         windows = list()
@@ -1116,12 +1117,14 @@ def seq_to_altstrobes_iter(seq: str, k_size1: int, k_size2: int, strobe_w_min_of
 
         min_values = []
         for index_order in range(1, order):
-            if seed_k1:
+            if len(range(*windows[index_order-1])) == 0:
+                continue
+            elif seed_k1:
                 min_index, min_value = argmin([
-                    (min_hash_val + hash_seq_list2[i][1]) % prime
+                    (hash_m1 ^ hash_seq_list2[i][1]) % prime
                     for i in range(*windows[index_order-1])
                 ])
-                min_hash_val = min_hash_val + (index_order * (-1)**index_order) * hash_seq_list2[windows[index_order-1][0] + min_index][1]
+                min_hash_val = min_hash_val + ((index_order+1) * (-1)**index_order) * hash_seq_list2[windows[index_order-1][0] + min_index][1]
                 if generalized:
                     index.append(min_index+windows[index_order-1][0])
                     index.append(min_index+windows[index_order-1][0])
@@ -1131,10 +1134,10 @@ def seq_to_altstrobes_iter(seq: str, k_size1: int, k_size2: int, strobe_w_min_of
                 min_values.append(min_value)
             else:
                 min_index, min_value = argmin([
-                    (min_hash_val + hash_seq_list1[i][1]) % prime
+                    (hash_m1 ^ hash_seq_list1[i][1]) % prime
                     for i in range(*windows[index_order-1])
                 ])
-                min_hash_val = min_hash_val + (index_order * (-1)**index_order) * hash_seq_list1[windows[index_order-1][0] + min_index][1]
+                min_hash_val = min_hash_val + ((index_order+1) * (-1)**index_order) * hash_seq_list1[windows[index_order-1][0] + min_index][1]
                 index.append(min_index+windows[index_order-1][0]) # -
                 min_values.append(min_value)
             seed_k1 = not seed_k1
@@ -1144,7 +1147,7 @@ def seq_to_altstrobes_iter(seq: str, k_size1: int, k_size2: int, strobe_w_min_of
 
 def altstrobes(seq: str, k_size: int, strobe_w_min_offset: int,
                strobe_w_max_offset: int, w: int, order: int = 2,
-               prime: int = 997) -> dict:
+               prime: int = 997, arg: int = 50) -> dict:
     """
     Strobemer seeding protocol to sample altstrobes
 
@@ -1168,7 +1171,7 @@ def altstrobes(seq: str, k_size: int, strobe_w_min_offset: int,
     m_size2 = int(4*k_size/(3*order))
 
     altstrobes = {tuple(index): h for index, h in seq_to_altstrobes_iter(
-        seq, m_size1, m_size2, strobe_w_min_offset, strobe_w_max_offset, prime, w, order
+        seq, m_size1, m_size2, strobe_w_min_offset, strobe_w_max_offset, prime, w, order, arg=arg
     )}
     return altstrobes
 
@@ -1199,7 +1202,7 @@ def altstrobes_iter(seq: str, k_size: int, strobe_w_min_offset: int,
 
 def altstrobes_generalized(seq: str, k_size1: int, k_size2: int, strobe_w_min_offset: int,
                strobe_w_max_offset: int, w: int, order: int = 2,
-               prime: int = 997, arg: int = 0) -> dict:
+               prime: int = 997, arg: int = 50) -> dict:
     """
     Strobemer seeding protocol to sample altstrobes
 
@@ -1274,7 +1277,8 @@ def seq_to_mixedaltstrobes_iter(seq: str, k_size1: int, k_size2: int, strobe_w_m
             else:
                 seed_k1 = True
                 index = [p1, p1+k_size1]
-                min_hash_val = hash_seq_list2[p1][1]
+                hash_m1 = hash_seq_list2[p1][1]
+                min_hash_val = hash_m1
                 required_length = required_length2
 
             windows = list()
@@ -1322,19 +1326,19 @@ def seq_to_mixedaltstrobes_iter(seq: str, k_size1: int, k_size2: int, strobe_w_m
             for index_order in range(1, order):
                 if seed_k1:
                     min_index, min_value = argmin([
-                        (min_hash_val + hash_seq_list2[i][1]) % prime
+                        (hash_m1 ^ hash_seq_list2[i][1]) % prime
                         for i in range(*windows[index_order-1])
                     ])
-                    min_hash_val = min_hash_val + (index_order * (-1)**index_order) * hash_seq_list2[windows[index_order-1][0] + min_index][1]
+                    min_hash_val = min_hash_val + ((index_order+1) * (-1)**index_order) * hash_seq_list2[windows[index_order-1][0] + min_index][1]
                     index.append(min_index+windows[index_order-1][0])
                     index.append(min_index+windows[index_order-1][0]+k_size1)
                     min_values.append(min_value)
                 else:
                     min_index, min_value = argmin([
-                        (min_hash_val + hash_seq_list1[i][1]) % prime
+                        (hash_m1 ^ hash_seq_list1[i][1]) % prime
                         for i in range(*windows[index_order-1])
                     ])
-                    min_hash_val = min_hash_val + (index_order * (-1)**index_order) * hash_seq_list1[windows[index_order-1][0] + min_index][1]
+                    min_hash_val = min_hash_val + ((index_order+1) * (-1)**index_order) * hash_seq_list1[windows[index_order-1][0] + min_index][1]
                     index.append(min_index+windows[index_order-1][0]) # -
                     min_values.append(min_value)
                 seed_k1 = not seed_k1
@@ -1430,6 +1434,189 @@ def mixedaltstrobes_iter(seq: str, k_size: int, strobe_w_min_offset: int,
             yield p, m
 
 
+def seq_to_multistrobes_iter(seq: str, k_size: int, strobe_w_min_offset: int,
+                                     strobe_w_max_offset: int, prime: int, w: int,
+                                     order: int, k_boundary: int,
+                                     arg: int=50) -> Iterator[tuple]:
+    """
+    Iterator for creation of altstrobes of any order
+
+    :param seq: a string with a nucleotide sequence
+    :param k_size1/2: length of each strobe
+    :param strobe_w_min_offset: minimum window offset to the previous window (wMin > 0)
+    :param strobe_w_max_offset: maximum window offset to the previous window (wMin <= wMax)
+    :param prime: prime number (q) in minimizing h(m)+h(mj) mod q
+    :param w: number of hashes used in a sliding window for thinning (w=1 means no thinning)
+    :param order: number of substrings/strobes
+    :returns: an iterator for creating altstrobes
+    """
+    assert k_boundary > 0, "[Error] It is not possible to sample 0mers"
+    assert order % 2 == 0, "Number of strobes has to be even in this implementation"
+
+    k_size = int(2*k_size/order)
+
+    hash_seq_lists = []
+    strobe_w_min_offsets = []
+    strobe_w_max_offsets = []
+    hash_seq_lists_thinned = []
+    required_length = (order-1) * strobe_w_max_offset + k_size/2
+
+    for k1 in range(k_boundary, k_size-k_boundary+1):
+        hash_seq_lists.append([(i, hash(seq[i:i+k1])) for i in range(len(seq) - k1 + 1)])
+        strobe_w_min_offsets.append(int(strobe_w_min_offset - k1 + k_size/2))
+        strobe_w_max_offsets.append(int(strobe_w_max_offset - k1 + k_size/2))
+
+    # thinning
+    if w > 1:
+        # produce a subset of positions, still with same index as in full sequence
+        for n in range(len(hash_seq_lists)):
+            hash_seq_lists_thinned.append(thinner([h for i, h in hash_seq_lists[n]], w))
+    else:
+        for n in range(len(hash_seq_lists)):
+            hash_seq_lists_thinned.append(hash_seq_lists[n])
+
+    if len(hash_seq_lists) % 2 == 0:
+        k_size_options = int(len(hash_seq_lists)/2)
+    else:
+        k_size_options = int(len(hash_seq_lists)/2+1)
+
+    for p1, (p1, hash_m1) in enumerate(hash_seq_lists_thinned[0]):  # [:-k_size]:
+        if p1 >= min(len(hash_seq_lists[0]) - (order-1)*k_boundary, len(hash_seq_lists[-1]) - (order-1)*(k_size-k_boundary)):
+            break
+        # hash_m1 = hash_seq_list[p]
+
+        k_size_selection = hash_m1 % k_size_options
+
+        if hash_seq_lists[k_size_selection][p1][1] // 100 % 100 < arg:
+            k_size_2_selection = -(k_size_selection+1)
+            k_size1 = k_size_selection + k_boundary
+            k_size2 = k_size - k_size1
+        else:
+            k_size_2_selection = hash_m1 % k_size_options
+            k_size_selection = -(k_size_2_selection+1)
+            k_size2 = k_size_2_selection + k_boundary
+            k_size1 = k_size - k_size2
+        hash_m1 = hash_seq_lists[k_size_selection][p1][1]
+
+        if p1 + required_length <= len(seq):
+            windows = list()
+            current_strobe_offset = p1
+            for window_order in range(1, order):
+                if window_order % 2 == 1:
+                    start = strobe_w_min_offsets[k_size_2_selection] + current_strobe_offset
+                    current_strobe_offset += strobe_w_max_offsets[k_size_2_selection]
+                    end = min(current_strobe_offset, len(hash_seq_lists[k_size_2_selection]))
+                else:
+                    start = strobe_w_min_offsets[k_size_selection] + current_strobe_offset
+                    current_strobe_offset += strobe_w_max_offsets[k_size_selection]
+                    end = min(current_strobe_offset, len(hash_seq_lists[k_size_selection]))
+                windows.append((start, end))
+
+        else:
+            windows = list()
+            current_strobe_offset = p1
+            current_strobe_length = p1
+            for window_order in range(1, order):
+                if window_order % 2 == 1:
+                    current_strobe_length += k_size1
+                    start = (max(
+                        current_strobe_length,
+                        len(hash_seq_lists[k_size_2_selection]) + strobe_w_min_offsets[k_size_2_selection] - (order - window_order) * strobe_w_max_offset
+                        )
+                    )
+                    current_strobe_offset += strobe_w_max_offsets[k_size_2_selection]
+                    end = min(current_strobe_offset, len(hash_seq_lists[k_size_2_selection]))
+                else:
+                    current_strobe_length += k_size2
+                    start = (max(
+                        current_strobe_length,
+                        len(hash_seq_lists[k_size_selection]) + strobe_w_min_offsets[k_size_selection] - (order - window_order) * strobe_w_max_offset
+                        )
+                    )
+                    current_strobe_offset += strobe_w_max_offsets[k_size_selection]
+                    end = min(current_strobe_offset, len(hash_seq_lists[k_size_selection]))
+
+                windows.append((start, end))
+
+        index = [range(p1, p1+k_size1), ] # -p1
+        min_values = []
+        min_hash_val = hash_m1
+        for index_order in range(1, order):
+            if len(range(*windows[index_order-1])) == 0:
+                continue
+            elif index_order % 2 == 1:
+                min_index, min_value = argmin([
+                    (hash_m1 ^ hash_seq_lists[k_size_2_selection][i][1]) % prime
+                    for i in range(*windows[index_order-1])
+                ])
+
+                min_hash_val = min_hash_val + ((index_order+1) * (-1)**index_order) * hash_seq_lists[k_size_2_selection][windows[index_order-1][0] + min_index][1]
+                index.append(range(min_index+windows[index_order-1][0], min_index+windows[index_order-1][0]+k_size2))
+                min_values.append(min_value)
+            else:
+                min_index, min_value = argmin([
+                    (hash_m1 ^ hash_seq_lists[k_size_selection][i][1]) % prime
+                    for i in range(*windows[index_order-1])
+                ])
+
+                min_hash_val = min_hash_val + ((index_order+1) * (-1)**index_order) * hash_seq_lists[k_size_selection][windows[index_order-1][0] + min_index][1]
+                index.append(range(min_index+windows[index_order-1][0], min_index+windows[index_order-1][0]+k_size1))
+                min_values.append(min_value)
+
+        if min_hash_val == 0:
+            print(len(seq), index, start, end, k_size1, k_size2, min_hash_val)
+        yield index, min_hash_val# , min_values
+
+
+def multistrobes(seq: str, k_size: int, strobe_w_min_offset: int,
+                         strobe_w_max_offset: int, w: int, order: int = 2,
+                         prime: int = 997, k_boundary: int = 5,
+                         arg: int = 50) -> dict:
+    """
+    Strobemer seeding protocol to sample altstrobes
+
+    :param seq: a string with a nucleotide sequence
+    :param k_size: length of all strobes (len(strobe_1) +  ... + len(strobe_n))
+    :param strobe_w_min_offset: minimum window offset to the previous window (wMin > 0)
+    :param strobe_w_max_offset: maximum window offset to the previous window (wMin <= wMax)
+    :param w: number of hashes used in a sliding window for thinning (w=1 means no thinning)
+    :param order: number of substrings/strobes
+    :param prime: prime number (q) in minimizing h(m)+h(mj) mod q
+    :returns: a dictionary with positions along the string as keys and the altstrobes as value
+    """
+
+    assert strobe_w_min_offset > 0, "Minimum strobemer offset has to be greater than 0 in this implementation"
+
+    multistrobes = {tuple(index): h for index, h in seq_to_multistrobes_iter(
+        seq, k_size, strobe_w_min_offset, strobe_w_max_offset, prime, w, order, k_boundary, arg
+    )}
+    return multistrobes
+
+
+def multistrobes_iter(seq: str, k_size: int, strobe_w_min_offset: int,
+                              strobe_w_max_offset: int, w: int, order: int = 2,
+                              k_boundary: int=5, buffer_size: int = 10000000) -> Iterator[tuple]:
+    """
+    Generator for creating altstrobes (less memory requiring)
+
+    :param seq: a string with a nucleotide sequence
+    :param k_size: length of all strobes (len(strobe_1) +  ... + len(strobe_n))
+    :param strobe_w_min_offset: minimum window offset to the previous window (wMin > 0)
+    :param strobe_w_max_offset: maximum window offset to the previous window (wMin <= wMax)
+    :param w: number of hashes used in a sliding window for thinning (w=1 means no thinning)
+    :param order: number of substrings/strobes
+    :param buffer_size: size of buffer at the end of the sequence
+    :returns: an iterator for creating altstrobes
+    """
+    for i in range(0, len(seq), buffer_size):
+        substring = seq[i:i+buffer_size]
+        for p, m in multistrobes(
+                substring, k_size, strobe_w_min_offset, strobe_w_max_offset,
+                w, order=order, k_boundary=k_boundary).items():
+
+            yield p, m
+
+
 """
 Mixedstrobemer techniques sampling seeds using two strobemer protocols
 """
@@ -1500,6 +1687,19 @@ def seq_to_mixedstrobes_iter(method1: str, method2: str, seq: str,
         strobe_w_max_offset2 = int(strobe_w_max_offset + (k_size1-k_size2)/2)
         required_length1 = order * strobe_w_max_offset - strobe_w_max_offset1
         required_length2 = order * strobe_w_max_offset - strobe_w_max_offset2
+    if "multistrobes" in (method1, method2):
+        k_boundary = 5
+        hash_seq_lists = []
+        strobe_w_min_offsets = []
+        strobe_w_max_offsets = []
+        for k1 in range(k_boundary, order*k_size-k_boundary+1):
+            hash_seq_lists.append([(i, hash(seq[i:i+k1])) for i in range(len(seq) - k1 + 1)])
+            strobe_w_min_offsets.append(int(strobe_w_min_offset + k1 - 15))
+            strobe_w_max_offsets.append(int(strobe_w_max_offset + k1 - 15))
+        if len(hash_seq_lists) % 2 == 0:
+            k_size_options = int(len(hash_seq_lists)/2)
+        else:
+            k_size_options = int(len(hash_seq_lists)/2+1)
 
     for (p1, hash_m1) in hash_seq_list_thinned:  # [:-k_size]:
         if p1 >= len(hash_seq_list) - (order-1)*k_size:
@@ -1519,6 +1719,10 @@ def seq_to_mixedstrobes_iter(method1: str, method2: str, seq: str,
                     break
                 index, min_hash_val = sample_altstrobes(seq, hash_seq_list1, hash_seq_list2, p1, hash_m1, k_size1, k_size2, strobe_w_min_offset1, strobe_w_max_offset1,
                                                         strobe_w_min_offset2, strobe_w_max_offset2, strobe_w_max_offset, prime, order, required_length1, required_length2)
+            elif method1 == "multistrobes":
+                if p1 >= min(len(hash_seq_lists[0]) - (order-1)*k_boundary, len(hash_seq_lists[-1]) - (order-1)*(order*k_size-k_boundary)):
+                    break
+                index, min_hash_val = sample_multistrobes(seq, hash_seq_lists, p1, hash_m1, order*k_size, k_size_options, strobe_w_min_offsets, strobe_w_max_offsets, prime, order, k_boundary)
             else:
                 print("Seeding Technique not known")
                 raise NotImplementedError
@@ -1539,6 +1743,10 @@ def seq_to_mixedstrobes_iter(method1: str, method2: str, seq: str,
                     break
                 index, min_hash_val = sample_altstrobes(seq, hash_seq_list1, hash_seq_list2, p1, hash_m1, k_size1, k_size2, strobe_w_min_offset1, strobe_w_max_offset1,
                                                         strobe_w_min_offset2, strobe_w_max_offset2, strobe_w_max_offset, prime, order, required_length1, required_length2)
+            elif method2 == "multistrobes":
+                if p1 >= min(len(hash_seq_lists[0]) - (order-1)*k_boundary, len(hash_seq_lists[-1]) - (order-1)*(order*k_size-k_boundary)):
+                    break
+                index, min_hash_val = index, min_hash_val = sample_multistrobes(seq, hash_seq_lists, p1, hash_m1, order*k_size, k_size_options, strobe_w_min_offsets, strobe_w_max_offsets, prime, order, k_boundary)
             else:
                 print("Seeding Technique not known")
                 raise NotImplementedError
@@ -1585,11 +1793,11 @@ def sample_randstrobes(seq: str, hash_seq_list: list, p1: int, hash_m1: int,
     min_hash_val = hash_m1
     for index_order in range(1, order):
         min_index, min_value = argmin([
-            (min_hash_val + hash_seq_list[i][1]) % prime
+            (hash_m1 ^ hash_seq_list[i][1])
             for i in range(*windows[index_order-1])
         ])
 
-        min_hash_val = min_hash_val + (index_order * (-1)**index_order) * hash_seq_list[windows[index_order-1][0] + min_index][1]
+        min_hash_val = min_hash_val + ((index_order+1) * (-1)**index_order) * hash_seq_list[windows[index_order-1][0] + min_index][1]
         index.append(range(min_index+windows[index_order-1][0], min_index+windows[index_order-1][0]+k_size))
     return index, min_hash_val
 
@@ -1696,7 +1904,8 @@ def sample_altstrobes(seq: str, hash_seq_list1: list, hash_seq_list2: list, p1: 
     else:
         seed_k1 = True
         index = [range(p1, p1+k_size2), ]
-        min_hash_val = hash_seq_list2[p1][1]
+        hash_m1 = hash_seq_list2[p1][1]
+        min_hash_val = hash_m1
         required_length = required_length2
 
     windows = list()
@@ -1744,21 +1953,110 @@ def sample_altstrobes(seq: str, hash_seq_list1: list, hash_seq_list2: list, p1: 
     for index_order in range(1, order):
         if seed_k1:
             min_index, min_value = argmin([
-                (min_hash_val + hash_seq_list2[i][1]) % prime
+                (hash_m1 ^ hash_seq_list2[i][1]) % prime
                 for i in range(*windows[index_order-1])
             ])
-            min_hash_val = min_hash_val + (index_order * (-1)**index_order) * hash_seq_list2[windows[index_order-1][0] + min_index][1]
+            min_hash_val = min_hash_val + ((index_order+1) * (-1)**index_order) * hash_seq_list2[windows[index_order-1][0] + min_index][1]
             index.append(range(min_index+windows[index_order-1][0], min_index+windows[index_order-1][0]+k_size2))
             # min_values.append(min_value)
         else:
             min_index, min_value = argmin([
-                (min_hash_val + hash_seq_list1[i][1]) % prime
+                (hash_m1 ^ hash_seq_list1[i][1]) % prime
                 for i in range(*windows[index_order-1])
             ])
-            min_hash_val = min_hash_val + (index_order * (-1)**index_order) * hash_seq_list1[windows[index_order-1][0] + min_index][1]
+            min_hash_val = min_hash_val + ((index_order+1) * (-1)**index_order) * hash_seq_list1[windows[index_order-1][0] + min_index][1]
             index.append(range(min_index+windows[index_order-1][0], min_index+windows[index_order-1][0]+k_size1)) # -
             # min_values.append(min_value)
 
+    return index, min_hash_val
+
+
+def sample_multistrobes(seq: str, hash_seq_lists: list, p1: int,
+                        hash_m1: int, k_size: int, k_size_options: int,
+                        strobe_w_min_offsets: list,
+                        strobe_w_max_offsets: list, prime: int,
+                        order: int, k_boundary: int):
+    """
+    """
+    hash_m1 = hash_seq_lists[0][p1][1]  # not necessary, but guarantees identical values to multistrobes
+    k_size_selection = hash_m1 % k_size_options
+    k_size_2_selection = -(k_size_selection+1)
+    k_size1 = k_size_selection + k_boundary
+    k_size2 = k_size - k_size1
+    hash_m1 = hash_seq_lists[k_size_selection][p1][1]
+    # print(hash_m1, k_size_options, k_size1, k_size2)
+
+    if hash_m1 // 100 % 2 == 0: # first k_size1, then k_size2 (e.g. 10-20)
+        # print("10-20")
+        if p1 + (order-1) * strobe_w_max_offsets[k_size_2_selection] <= len(hash_seq_lists[k_size_2_selection]):
+            windows = list()
+            for window_order in range(1, order):
+                start = p1 + strobe_w_min_offsets[k_size_2_selection] + (window_order-1) * strobe_w_max_offsets[k_size_2_selection]
+                end = min(p1 + window_order * strobe_w_max_offsets[k_size_2_selection], len(hash_seq_lists[k_size_2_selection]))
+                windows.append((start, end))
+
+        else:
+            windows = list()
+            for window_order in range(1, order):
+                start = (max(
+                    p1+window_order*k_size2,
+                    len(hash_seq_lists[k_size_2_selection]) + strobe_w_min_offsets[k_size_2_selection] - (order - window_order) * strobe_w_max_offsets[k_size_2_selection]
+                    )
+                )
+
+                end = min(p1 + window_order * strobe_w_max_offsets[k_size_2_selection], len(hash_seq_lists[k_size_2_selection]))
+                windows.append((start, end))
+
+        index = [range(p1, p1+k_size1), ] # -p1
+        min_values = []
+        min_hash_val = hash_m1
+        for index_order in range(1, order):
+            min_index, min_value = argmin([
+                (hash_m1 ^ hash_seq_lists[k_size_2_selection][i][1]) % prime
+                for i in range(*windows[index_order-1])
+            ])
+
+            min_hash_val = min_hash_val + ((index_order+1) * (-1)**index_order) * hash_seq_lists[k_size_2_selection][windows[index_order-1][0] + min_index][1]
+            index.append(range(min_index+windows[index_order-1][0], min_index+windows[index_order-1][0]+k_size2))
+            min_values.append(min_value)
+
+    else: # first k_size2, then k_size1 (e.g. 20-10)
+        # print("20-10")
+
+        if p1 + (order-1) * strobe_w_max_offsets[k_size_selection] <= len(hash_seq_lists[k_size_selection]):
+            windows = list()
+            for window_order in range(1, order):
+                start = p1 + strobe_w_min_offsets[k_size_selection] + (window_order-1) * strobe_w_max_offsets[k_size_selection]
+                end = min(p1 + window_order * strobe_w_max_offsets[k_size_selection], len(hash_seq_lists[k_size_selection]))
+                windows.append((start, end))
+
+        else:
+            windows = list()
+            for window_order in range(1, order):
+                start = (max(
+                    p1+window_order*k_size1,
+                    len(hash_seq_lists[k_size_selection]) + strobe_w_min_offsets[k_size_selection] - (order - window_order) * strobe_w_max_offsets[k_size_selection]
+                    )
+                )
+
+                end = min(p1 + window_order * strobe_w_max_offsets[k_size_selection], len(hash_seq_lists[k_size_selection]))
+                windows.append((start, end))
+
+        index = [range(p1, p1+k_size2)]
+        min_values = []
+        hash_m1 = hash_seq_lists[k_size_2_selection][p1][1]
+        min_hash_val = hash_m1
+        for index_order in range(1, order):
+            min_index, min_value = argmin([
+                (hash_m1 ^ hash_seq_lists[k_size_selection][i][1]) % prime
+                for i in range(*windows[index_order-1])
+            ])
+
+            min_hash_val = min_hash_val + ((index_order+1) * (-1)**index_order) * hash_seq_lists[k_size_selection][windows[index_order-1][0] + min_index][1]
+            index.append(range(min_index+windows[index_order-1][0], min_index+windows[index_order-1][0]+k_size1)) # -
+            min_values.append(min_value)
+
+    # print(index, start, end, min_hash_val)
     return index, min_hash_val
 
 
