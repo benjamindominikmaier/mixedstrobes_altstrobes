@@ -11,7 +11,7 @@ from collections import namedtuple
 
 import RMQT as RMaxQST
 
-NAM = namedtuple('NAM', ['x', 'y', 'c', 'd', 'val', 'j', "chr_id"])
+NAM = namedtuple('NAM', ['x', 'y', 'c', 'd', 'val', 'j', "chr_id", "len1", "len2"])
 
 def readfq(fp): # this is a generator function
     '''
@@ -68,7 +68,7 @@ def get_NAM_records(NAM_path, reads):
 
                 for chr_id in list(read_mems_tmp.keys()):
                     coordinate_sorted_tuples = sorted(read_mems_tmp[chr_id], key = lambda x: x[1])
-                    sorted_mems = [ NAM(x,y,c,d,val,j,e_id) for j, (x, y, c, d, val, e_id) in enumerate(coordinate_sorted_tuples) ]
+                    sorted_mems = [ NAM(x,y,c,d,val,j,e_id,u,v) for j, (x, y, c, d, val, e_id, u, v) in enumerate(coordinate_sorted_tuples) ]
                     read_mems_tmp[chr_id] = sorted_mems
 
                 yield read_acc, read_mems_tmp
@@ -85,15 +85,18 @@ def get_NAM_records(NAM_path, reads):
                 mem_read_start = int(vals[2]) - 1
                 mem_genome_start = int(vals[1]) - 1
 
+                len1 = int(vals[4])
+                len2 = int(vals[5])
+
                 info_tuple = ( mem_genome_start, mem_genome_start + mem_len - 1,
                                 mem_read_start, mem_read_start + mem_len - 1,
-                                mem_len, chr_id)
+                                mem_len, chr_id, len1, len2)
                 read_mems_tmp[chr_id].append( info_tuple )
 
 
     for chr_id in list(read_mems_tmp.keys()):
         coordinate_sorted_tuples = sorted(read_mems_tmp[chr_id], key = lambda x: x[1])
-        sorted_mems = [ NAM(x,y,c,d,val,j,e_id) for j, (x, y, c, d, val, e_id) in enumerate(coordinate_sorted_tuples) ]
+        sorted_mems = [ NAM(x,y,c,d,val,j,e_id,u,v) for j, (x, y, c, d, val, e_id, u, v) in enumerate(coordinate_sorted_tuples) ]
         read_mems_tmp[chr_id] = sorted_mems
     # print("READ {0} LINES.".format(i))
     yield read_acc, read_mems_tmp
