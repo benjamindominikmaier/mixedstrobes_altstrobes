@@ -1,0 +1,85 @@
+w_min,w_max,type,x,m,y,mean_error_y_est,analysis,ymetric
+75,100,k-mers,30,-,0,-,altstrobes-analysis,Entropy
+75,100,altstrobes,1,-,6.5716083751168,-,altstrobes-analysis,Entropy
+75,100,altstrobes,2,-,11.534580731073696,-,altstrobes-analysis,Entropy
+75,100,altstrobes,3,-,15.560185169789127,-,altstrobes-analysis,Entropy
+75,100,altstrobes,4,-,18.807766905326968,-,altstrobes-analysis,Entropy
+75,100,altstrobes,5,-,21.359588658178378,-,altstrobes-analysis,Entropy
+75,100,altstrobes,6,-,23.268402115182962,-,altstrobes-analysis,Entropy
+75,100,altstrobes,7,-,24.57312893672991,-,altstrobes-analysis,Entropy
+75,100,altstrobes,8,-,25.305503710905835,-,altstrobes-analysis,Entropy
+75,100,altstrobes,9,-,25.493528964187846,-,altstrobes-analysis,Entropy
+75,100,altstrobes,10,-,25.163564014312332,-,altstrobes-analysis,Entropy
+75,100,altstrobes,11,-,24.341806137145454,-,altstrobes-analysis,Entropy
+75,100,altstrobes,12,-,23.0555808967649,-,altstrobes-analysis,Entropy
+75,100,altstrobes,13,-,21.334825092664126,-,altstrobes-analysis,Entropy
+75,100,altstrobes,14,-,19.21452318223396,-,altstrobes-analysis,Entropy
+75,100,randstrobes,15,-,16.74152877445665,-,altstrobes-analysis,Entropy
+75,100,k-mers,0.0,-,0,-,mixedstrobes-analysis,Entropy
+75,100,mixedstrobes,0.1,-,7.96990904445567,-,mixedstrobes-analysis,Entropy
+75,100,mixedstrobes,0.2,-,12.766133828991123,-,mixedstrobes-analysis,Entropy
+75,100,mixedstrobes,0.3,-,16.23816942052635,-,mixedstrobes-analysis,Entropy
+75,100,mixedstrobes,0.4,-,18.760084148920992,-,mixedstrobes-analysis,Entropy
+75,100,mixedstrobes,0.5,-,20.490448740552797,-,mixedstrobes-analysis,Entropy
+75,100,mixedstrobes,0.6,-,21.49914885578962,-,mixedstrobes-analysis,Entropy
+75,100,mixedstrobes,0.7,-,21.79884046430266,-,mixedstrobes-analysis,Entropy
+75,100,mixedstrobes,0.8,-,21.34128830487751,-,mixedstrobes-analysis,Entropy
+75,100,mixedstrobes,0.9,-,19.959678249174953,-,mixedstrobes-analysis,Entropy
+75,100,randstrobes,1.0,-,16.74152877445665,-,mixedstrobes-analysis,Entropy
+75,100,continous altstrobes,1,-,28.617335662751245,-,multistrobes-analysis,Entropy
+75,100,continous altstrobes,2,-,28.95663113982358,-,multistrobes-analysis,Entropy
+75,100,continous altstrobes,3,-,29.090468384884467,-,multistrobes-analysis,Entropy
+75,100,continous altstrobes,4,-,29.027499285959067,-,multistrobes-analysis,Entropy
+75,100,continous altstrobes,5,-,28.77478394644638,-,multistrobes-analysis,Entropy
+75,100,continous altstrobes,6,-,28.338457339370315,-,multistrobes-analysis,Entropy
+75,100,continous altstrobes,7,-,27.724083979797612,-,multistrobes-analysis,Entropy
+75,100,continous altstrobes,8,-,26.936828699078877,-,multistrobes-analysis,Entropy
+75,100,continous altstrobes,9,-,25.98151945169421,-,multistrobes-analysis,Entropy
+75,100,continous altstrobes,10,-,24.862588754794274,-,multistrobes-analysis,Entropy
+75,100,continous altstrobes,11,-,23.583792627189162,-,multistrobes-analysis,Entropy
+75,100,continous altstrobes,12,-,22.147372474485646,-,multistrobes-analysis,Entropy
+75,100,continous altstrobes,13,-,20.551456923559034,-,multistrobes-analysis,Entropy
+75,100,continous altstrobes,14,-,18.780073996629362,-,multistrobes-analysis,Entropy
+75,100,randstrobes,15,-,16.74152877445665,-,multistrobes-analysis,Entropy
+75,100,k-mers,30,68,22.832,-,altstrobes-analysis,p_match
+75,100,altstrobes,1,68,24.765000000000004,-,altstrobes-analysis,p_match
+75,100,altstrobes,2,68,26.653,-,altstrobes-analysis,p_match
+75,100,altstrobes,3,68,27.44200000000001,-,altstrobes-analysis,p_match
+75,100,altstrobes,4,68,27.895000000000014,-,altstrobes-analysis,p_match
+75,100,altstrobes,5,68,28.14400000000001,-,altstrobes-analysis,p_match
+75,100,altstrobes,6,68,28.459000000000007,-,altstrobes-analysis,p_match
+75,100,altstrobes,7,68,28.739000000000004,-,altstrobes-analysis,p_match
+75,100,altstrobes,8,68,28.879,-,altstrobes-analysis,p_match
+75,100,altstrobes,9,68,28.774000000000015,-,altstrobes-analysis,p_match
+75,100,altstrobes,10,68,28.820999999999998,-,altstrobes-analysis,p_match
+75,100,altstrobes,11,68,28.749,-,altstrobes-analysis,p_match
+75,100,altstrobes,12,68,28.566,-,altstrobes-analysis,p_match
+75,100,altstrobes,13,68,28.254,-,altstrobes-analysis,p_match
+75,100,altstrobes,14,68,28.129999999999995,-,altstrobes-analysis,p_match
+75,100,randstrobes,15,68,27.957000000000008,-,altstrobes-analysis,p_match
+75,100,k-mers,0.0,68,22.832,-,mixedstrobes-analysis,p_match
+75,100,mixed-randstrobes,0.1,68,24.674000000000007,-,mixedstrobes-analysis,p_match
+75,100,mixed-randstrobes,0.2,68,25.836000000000006,-,mixedstrobes-analysis,p_match
+75,100,mixed-randstrobes,0.3,68,26.713000000000005,-,mixedstrobes-analysis,p_match
+75,100,mixed-randstrobes,0.4,68,27.386000000000006,-,mixedstrobes-analysis,p_match
+75,100,mixed-randstrobes,0.5,68,27.846000000000004,-,mixedstrobes-analysis,p_match
+75,100,mixed-randstrobes,0.6,68,28.308999999999997,-,mixedstrobes-analysis,p_match
+75,100,mixed-randstrobes,0.7,68,28.574,-,mixedstrobes-analysis,p_match
+75,100,mixed-randstrobes,0.8,68,28.724000000000004,-,mixedstrobes-analysis,p_match
+75,100,mixed-randstrobes,0.9,68,28.618000000000013,-,mixedstrobes-analysis,p_match
+75,100,randstrobes,1.0,68,27.957000000000008,-,mixedstrobes-analysis,p_match
+75,100,multistrobes,1,68,29.02100000000002,-,multistrobes-analysis,p_match
+75,100,multistrobes,2,68,29.156000000000006,-,multistrobes-analysis,p_match
+75,100,multistrobes,3,68,29.081,-,multistrobes-analysis,p_match
+75,100,multistrobes,4,68,28.987000000000005,-,multistrobes-analysis,p_match
+75,100,multistrobes,5,68,28.970000000000013,-,multistrobes-analysis,p_match
+75,100,multistrobes,6,68,28.96500000000001,-,multistrobes-analysis,p_match
+75,100,multistrobes,7,68,28.803999999999995,-,multistrobes-analysis,p_match
+75,100,multistrobes,8,68,28.929000000000006,-,multistrobes-analysis,p_match
+75,100,multistrobes,9,68,28.682000000000002,-,multistrobes-analysis,p_match
+75,100,multistrobes,10,68,28.571999999999992,-,multistrobes-analysis,p_match
+75,100,multistrobes,11,68,28.50300000000001,-,multistrobes-analysis,p_match
+75,100,multistrobes,12,68,28.244999999999997,-,multistrobes-analysis,p_match
+75,100,multistrobes,13,68,28.221,-,multistrobes-analysis,p_match
+75,100,multistrobes,14,68,28.109,-,multistrobes-analysis,p_match
+75,100,randstrobes,15,68,28.067999999999994,-,multistrobes-analysis,p_match
