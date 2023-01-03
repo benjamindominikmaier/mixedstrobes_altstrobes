@@ -20,6 +20,7 @@ def print_stats(acc: str, datastructure: str, all_mers: dict, k_size: int, total
     :param total_mers: number of seeds for a given sequence and k-size
     """
     abundances = list(all_mers.values())
+    print(all_mers[0])
     del all_mers
     unique = abundances.count(1)
     percent_unique = round(100*unique/total_mers, 1)
@@ -28,6 +29,7 @@ def print_stats(acc: str, datastructure: str, all_mers: dict, k_size: int, total
     lower_75 = ab_sorted[1*len(abundances)//4]
     median = ab_sorted[len(abundances)//2]
     upper_75 = ab_sorted[3*len(abundances)//4]
+    print(max(abundances))
     ehits = round(sum(i*i for i in abundances)/sum(abundances),2)
 
     data = ",".join([
@@ -40,7 +42,7 @@ def print_stats(acc: str, datastructure: str, all_mers: dict, k_size: int, total
 
 def compute_uniqueness(args, acc: str, seq: str, k_size: int, w_low: int,
                        w_high: int, w: int, total_mers: int, order: int,
-                       fraction: float=1, k_size2: int=0) -> None:
+                       fraction: float=1, k_size2: int=0, k_boundary: int=5) -> None:
     """
     Compute uniqueness and e-hits of seeds for a given sequence and seeding technique
 
@@ -111,11 +113,13 @@ def compute_uniqueness(args, acc: str, seq: str, k_size: int, w_low: int,
 
     elif args.altstrobes:
         datastructure = "altstrobes" + str(order)
-        m_size1 = int(k_size/3)
-        m_size2 = int(2*k_size/3)
+        for _, s in indexing.altstrobes_iter(seq, k_size, w_low, w_high, w, order, buffer_size=10000000):
+            all_mers[s] += 1
 
-        k_size = (m_size1, m_size2)
-        for _, s in indexing.altstrobes_iter(seq, m_size1, m_size2, w_low, w_high, w, order, buffer_size=10000000):
+    elif args.multistrobes:
+        datastructure = "multistrobes" + str(order)
+
+        for _, s in indexing.multistrobes_iter(seq, k_size, w_low, w_high, w, order, k_boundary, buffer_size=1000000):  # buffer_size reduced by one order of magnitude to adjust for higher memeory usage
             all_mers[s] += 1
 
     elif args.mixedaltstrobes:
@@ -206,7 +210,7 @@ def uniqueness(args):
             seq = "".join([random.choice("ACGT") for i in range(args.L)])
             for k_size in args.k_sizes:  # [18,24,30,36]:
                 total_mers = len(seq) - k_size + 1
-                compute_uniqueness(args, "", seq, k_size, args.w_low, args.w_high, args.w, total_mers, args.order, args.strobe_fraction)
+                compute_uniqueness(args, "", seq, k_size, args.w_low, args.w_high, args.w, total_mers, args.order, args.strobe_fraction, k_boundary=args.k_boundary)
 
 
 if __name__ == '__main__':
@@ -221,16 +225,18 @@ if __name__ == '__main__':
     parser.add_argument('--mixedhybridstrobes',  action="store_true", help='Seeding mixedhybridstrobes (hybridstrobes/k-mers) with a user-defined --strobe_fraction')
     parser.add_argument('--spaced_dense',  action="store_true", help='Seeding spaced k-mers (dense)')
     parser.add_argument('--spaced_sparse',  action="store_true", help='Seeding spaced k-mers (sparse)')
-    parser.add_argument('--altstrobes',  action="store_true", help='Kmer size')
-    parser.add_argument('--mixedaltstrobes', action="store_true", help='Kmer size')
+    parser.add_argument('--altstrobes',  action="store_true", help='Seeding altstrobes')
+    parser.add_argument('--multistrobes', action="store_true", help='Seeding multistrobes of all combinations from (k_boundary,k-k_boundary) to (k/2,k/2)')
+    parser.add_argument('--mixedaltstrobes', action="store_true", help='Seeding mixedaltstrobes (altstrobes/k-mers) with a user-defined --strobe_fraction')
     parser.add_argument('--order', type=int, default=2, help='Order on strobes')
     parser.add_argument('--strobe_fraction', type=float, default=1, help='Fraction of sampled strobemers, rest kmers')
     parser.add_argument('--k_sizes', '--nargs-int-type', nargs='+', type=int, default=[18, 24, 30, 36], help="List with strobe lengths to be analyzed")
+    parser.add_argument('--k_boundary', type=int, default=5, help='minimum strobe length (k >= 4 recommended to ensure uniqueness)')
     parser.add_argument('--w', type=int, default=1, help="number of hashes used in a sliding window for thinning (w=1 means no thinning)")
     parser.add_argument('--w_low', type=int, default=25, help="minimum window offset to the previous window (wMin > 0)")
     parser.add_argument('--w_high', type=int, default=50, help="maximum window offset to the previous window (wMin <= wMax)")
     parser.add_argument('--altstrobes_generalized', type=int, default=0, help='Choose k-size to seed altstrobes with strobe combinations from (1,k-1) to (k-1,1)')
-    parser.add_argument('--L', type=int, default=10000, help='Length of simulated sequences (only if no fasta file is provided)')
+    parser.add_argument('--L', type=int, default=100000, help='Length of simulated sequences (only if no fasta file is provided)')
     parser.add_argument('--nr_exp', type=int, default=1, help='Number of simulated experiments (only if no fasta file is provided)')
     args = parser.parse_args()
 

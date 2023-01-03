@@ -11,6 +11,7 @@ python3 uniqueness_analysis.py --fasta ../data/chr21.fna --order 3 --minstrobes
 python3 uniqueness_analysis.py --fasta ../data/chr21.fna --order 3 --randstrobes
 python3 uniqueness_analysis.py --fasta ../data/chr21.fna --order 3 --hybridstrobes
 python3 uniqueness_analysis.py --fasta ../data/chr21.fna --order 2 --altstrobes
+python3 uniqueness_analysis.py --fasta ../data/chr21.fna --order 2 --multistrobes
 
 python3 uniqueness_analysis.py --fasta ../data/chr21.fna --order 2 --strobe_fraction 0.1 --mixedminstrobes
 python3 uniqueness_analysis.py --fasta ../data/chr21.fna --order 2 --strobe_fraction 0.1 --mixedrandstrobes
