@@ -81,6 +81,7 @@ static ko_longopt_t long_options[] = {
 	{"mixedstrobes", ko_no_argument, 354},
 	{"altstrobes", ko_no_argument, 355},
 	{"randstrobes", ko_no_argument, 356},
+	{"multistrobes", ko_no_argument, 357},
 	{"help", ko_no_argument, 'h'},
 	{"max-intron-len", ko_required_argument, 'G'},
 	{"version", ko_no_argument, 'V'},
@@ -136,7 +137,7 @@ static inline void yes_or_no(mm_mapopt_t *opt, int64_t flag, int long_idx, const
 
 int main(int argc, char *argv[])
 {
-	const char *opt_str = "2aSDw:k:i:j:K:t:r:f:Vv:g:G:I:d:XT:s:x:Hcp:M:n:z:A:B:O:E:m:N:Qu:R:hF:LC:yYPo:e:U:";
+	const char *opt_str = "2aSDw:k:i:j:b:K:t:r:f:Vv:g:G:I:d:XT:s:x:Hcp:M:n:z:A:B:O:E:m:N:Qu:R:hF:LC:yYPo:e:U:";
 	ketopt_t o = KETOPT_INIT;
 	mm_mapopt_t opt;
 	mm_idxopt_t ipt;
@@ -184,6 +185,8 @@ int main(int argc, char *argv[])
 			ipt.w_min = atoi(o.arg);
 		else if (c == 'j')
 			ipt.w_max = atoi(o.arg);
+		else if (c == 'b')
+			ipt.k_min = atoi(o.arg);
 		else if (c == 'H')
 			ipt.flag |= MM_I_HPC;
 		else if (c == 'd')
@@ -352,8 +355,12 @@ int main(int argc, char *argv[])
 			ipt.flag |= MM_F_ALT;
 		}
 		else if (c == 356){
-			opt.flag |= MM_F_RAND;
+			opt.flag |= MM_F_RAND; // --randstrobes (sample randstrobes)
 			ipt.flag |= MM_F_RAND;
+		}
+		else if (c == 357){
+			opt.flag |= MM_F_MULT; // --multistrobes (sample multistrobes)
+			ipt.flag |= MM_F_MULT;
 		}
 		else if (c == 330)
 		{
@@ -533,6 +540,8 @@ int main(int argc, char *argv[])
 		fprintf(fp_help, " --mixedstrobes  sample mixedrandstrobes80 instead of k-mers\n");
 		fprintf(fp_help, " --altstrobes    sample altstrobes (k,2k) instead of k-mers\n");
 		fprintf(fp_help, " --randstrobes   sample randstrobes (k,k) instead of k-mers\n");
+		fprintf(fp_help, " --multistrobes  sample multistrobes (k_boundary, k-k_boundary\n");
+		fprintf(fp_help, "    -b INT       minimal k-mer size (multistrobes) [5].\n");
 		fprintf(fp_help, "    -i INT       minimal strobe offset [25].\n");
 		fprintf(fp_help, "    -j INT       maximial strobe offset [50].\n");
 		//		fprintf(fp_help, "    -v INT       verbose level [%d]\n", mm_verbose);
@@ -552,17 +561,24 @@ int main(int argc, char *argv[])
 	if (opt.flag & MM_F_MIX){
 		fprintf(stderr, "[MODE] mixedrandstrobes80\n");
 		ipt.mode = 1;
+		ipt.k_min = 0;
 	} else if (opt.flag & MM_F_ALT){
 		fprintf(stderr, "[MODE] altstrobes\n");
 		ipt.mode = 2;
+		ipt.k_min = 0;
 	} else if (opt.flag & MM_F_RAND){
 		fprintf(stderr, "[MODE] randstrobes\n");
 		ipt.mode = 3;
+		ipt.k_min = 0;
+	} else if (opt.flag & MM_F_MULT){
+		fprintf(stderr, "[MODE] multistrobes\n");
+		ipt.mode = 4;
 	} else {
 		fprintf(stderr, "[MODE] kmers\n");
 		ipt.mode = 0;
 		ipt.w_min = 0;
 		ipt.w_max = 0;
+		ipt.k_min = 0;
 	}
 
 	if ((opt.flag & MM_F_SR) && argc - o.ind > 3)

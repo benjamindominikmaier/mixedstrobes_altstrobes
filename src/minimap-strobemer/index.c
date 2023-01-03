@@ -41,13 +41,13 @@ typedef struct mm_idx_intv_s {
 	mm_idx_intv1_t *a;
 } mm_idx_intv_t;
 
-mm_idx_t *mm_idx_init(int w, int k, int b, int flag, int w_min, int w_max, int mode)
+mm_idx_t *mm_idx_init(int w, int k, int k_min, int b, int flag, int w_min, int w_max, int mode)
 {
 	mm_idx_t *mi;
 	if (k*2 < b) b = k * 2;
 	if (w < 1) w = 1;
 	mi = (mm_idx_t*)calloc(1, sizeof(mm_idx_t));
-	mi->w = w, mi->k = k, mi->b = b, mi->flag = flag, mi->w_min = w_min, mi->w_max = w_max, mi->mode = mode;
+	mi->w = w, mi->k = k, mi->k_min = k_min, mi->b = b, mi->flag = flag, mi->w_min = w_min, mi->w_max = w_max, mi->mode = mode;
 	mi->B = (mm_idx_bucket_t*)calloc(1<<b, sizeof(mm_idx_bucket_t));
 	if (!(mm_dbg_flag & 1)) mi->km = km_init();
 	return mi;
@@ -358,11 +358,13 @@ static void *worker_pipeline(void *shared, int step, void *in)
 			mm_bseq1_t *t = &s->seq[i];
 			if (t->l_seq > 0) {
 				if (p->mi->mode == 2){
-					mm_sketch_altstrobes(0, t->seq, t->l_seq, p->mi->w, p->mi->k,  p->mi->w_min, p->mi->w_max, t->rid, p->mi->flag&MM_I_HPC, &s->a);
+					mm_sketch_altstrobes(0, t->seq, t->l_seq, p->mi->w, p->mi->k,  p->mi->k_min, p->mi->w_min, p->mi->w_max, t->rid, p->mi->flag&MM_I_HPC, &s->a);
 				} else if (p->mi->mode == 1){
-					mm_sketch_mixedstrobes(0, t->seq, t->l_seq, p->mi->w, p->mi->k, p->mi->w_min, p->mi->w_max, t->rid, p->mi->flag&MM_I_HPC, &s->a);
+					mm_sketch_mixedstrobes(0, t->seq, t->l_seq, p->mi->w, p->mi->k, p->mi->k_min, p->mi->w_min, p->mi->w_max, t->rid, p->mi->flag&MM_I_HPC, &s->a);
 				} else if (p->mi->mode == 3){
-					mm_sketch_randstrobes(0, t->seq, t->l_seq, p->mi->w, p->mi->k, p->mi->w_min, p->mi->w_max, t->rid, p->mi->flag&MM_I_HPC, &s->a);
+					mm_sketch_randstrobes(0, t->seq, t->l_seq, p->mi->w, p->mi->k, p->mi->k_min, p->mi->w_min, p->mi->w_max, t->rid, p->mi->flag&MM_I_HPC, &s->a);
+				} else if (p->mi->mode == 4){
+					mm_sketch_multistrobes(0, t->seq, t->l_seq, p->mi->w, p->mi->k, p->mi->k_min, p->mi->w_min, p->mi->w_max, t->rid, p->mi->flag&MM_I_HPC, &s->a);
 				} else {
 					mm_sketch(0, t->seq, t->l_seq, p->mi->w, p->mi->k, t->rid, p->mi->flag&MM_I_HPC, &s->a);
 				}
@@ -381,7 +383,7 @@ static void *worker_pipeline(void *shared, int step, void *in)
     return 0;
 }
 
-mm_idx_t *mm_idx_gen(mm_bseq_file_t *fp, int w, int k, int b, int flag, int w_min, int w_max, int mode, int mini_batch_size, int n_threads, uint64_t batch_size)
+mm_idx_t *mm_idx_gen(mm_bseq_file_t *fp, int w, int k, int k_min, int b, int flag, int w_min, int w_max, int mode, int mini_batch_size, int n_threads, uint64_t batch_size)
 {
 	pipeline_t pl;
 	if (fp == 0 || mm_bseq_eof(fp)) return 0;
@@ -389,7 +391,7 @@ mm_idx_t *mm_idx_gen(mm_bseq_file_t *fp, int w, int k, int b, int flag, int w_mi
 	pl.mini_batch_size = (uint64_t)mini_batch_size < batch_size? mini_batch_size : batch_size;
 	pl.batch_size = batch_size;
 	pl.fp = fp;
-	pl.mi = mm_idx_init(w, k, b, flag, w_min, w_max, mode);
+	pl.mi = mm_idx_init(w, k, k_min, b, flag, w_min, w_max, mode);
 
 	kt_pipeline(n_threads < 3? n_threads : 3, worker_pipeline, &pl, 3);
 	if (mm_verbose >= 3)
@@ -402,18 +404,18 @@ mm_idx_t *mm_idx_gen(mm_bseq_file_t *fp, int w, int k, int b, int flag, int w_mi
 	return pl.mi;
 }
 
-mm_idx_t *mm_idx_build(const char *fn, int w, int k, int flag, int w_min, int w_max, int mode, int n_threads) // a simpler interface; deprecated
+mm_idx_t *mm_idx_build(const char *fn, int w, int k, int k_min, int flag, int w_min, int w_max, int mode, int n_threads) // a simpler interface; deprecated
 {
 	mm_bseq_file_t *fp;
 	mm_idx_t *mi;
 	fp = mm_bseq_open(fn);
 	if (fp == 0) return 0;
-	mi = mm_idx_gen(fp, w, k, 14, flag, w_min, w_max, mode, 1<<18, n_threads, UINT64_MAX);
+	mi = mm_idx_gen(fp, w, k, k_min, 14, flag, w_min, w_max, mode, 1<<18, n_threads, UINT64_MAX);
 	mm_bseq_close(fp);
 	return mi;
 }
 
-mm_idx_t *mm_idx_str(int w, int k, int w_min, int w_max, int mode, int is_hpc, int bucket_bits, int n, const char **seq, const char **name)
+mm_idx_t *mm_idx_str(int w, int k, int k_min, int w_min, int w_max, int mode, int is_hpc, int bucket_bits, int n, const char **seq, const char **name)
 {
 	uint64_t sum_len = 0;
 	mm128_v a = {0,0,0};
@@ -427,7 +429,7 @@ mm_idx_t *mm_idx_str(int w, int k, int w_min, int w_max, int mode, int is_hpc, i
 	if (is_hpc) flag |= MM_I_HPC;
 	if (name == 0) flag |= MM_I_NO_NAME;
 	if (bucket_bits < 0) bucket_bits = 14;
-	mi = mm_idx_init(w, k, bucket_bits, flag, w_min, w_max, mode);
+	mi = mm_idx_init(w, k, k_min, bucket_bits, flag, w_min, w_max, mode);
 	mi->n_seq = n;
 	mi->seq = (mm_idx_seq_t*)kcalloc(mi->km, n, sizeof(mm_idx_seq_t)); // ->seq is allocated from km
 	mi->S = (uint32_t*)calloc((sum_len + 7) / 8, 4);
@@ -455,11 +457,13 @@ mm_idx_t *mm_idx_str(int w, int k, int w_min, int w_max, int mode, int is_hpc, i
 		if (p->len > 0) {
 			a.n = 0;
 			if (flag & MM_F_ALT){
-				mm_sketch_altstrobes(0, s, p->len, w, k, w_min, w_max, i, is_hpc, &a);
+				mm_sketch_altstrobes(0, s, p->len, w, k, k_min, w_min, w_max, i, is_hpc, &a);
 			} else if (flag & MM_F_MIX){
-				mm_sketch_mixedstrobes(0, s, p->len, w, k, w_min, w_max, i, is_hpc, &a);
+				mm_sketch_mixedstrobes(0, s, p->len, w, k, k_min, w_min, w_max, i, is_hpc, &a);
 			} else if (flag & MM_F_RAND){
-				mm_sketch_randstrobes(0, s, p->len, w, k, w_min, w_max, i, is_hpc, &a);
+				mm_sketch_randstrobes(0, s, p->len, w, k, k_min, w_min, w_max, i, is_hpc, &a);
+			} else if (flag & MM_F_MULT){
+				mm_sketch_multistrobes(0, s, p->len, w, k, k_min, w_min, w_max, i, is_hpc, &a);
 			} else {
 				mm_sketch(0, s, p->len, w, k, i, is_hpc, &a);
 			}
@@ -527,7 +531,7 @@ mm_idx_t *mm_idx_load(FILE *fp)
 	if (fread(magic, 1, 4, fp) != 4) return 0;
 	if (strncmp(magic, MM_IDX_MAGIC, 4) != 0) return 0;
 	if (fread(x, 4, 5, fp) != 5) return 0;
-	mi = mm_idx_init(x[0], x[1], x[2], x[4], x[5], x[6], x[7]);
+	mi = mm_idx_init(x[0], x[1], x[2], x[4], x[5], x[6], x[7], x[8]);
 	mi->n_seq = x[3];
 	mi->seq = (mm_idx_seq_t*)kcalloc(mi->km, mi->n_seq, sizeof(mm_idx_seq_t));
 	for (i = 0; i < mi->n_seq; ++i) {
@@ -627,10 +631,10 @@ mm_idx_t *mm_idx_reader_read(mm_idx_reader_t *r, int n_threads)
 	mm_idx_t *mi;
 	if (r->is_idx) {
 		mi = mm_idx_load(r->fp.idx);
-		if (mi && mm_verbose >= 2 && (mi->k != r->opt.k || mi->w != r->opt.w || mi->w_min != r->opt.w_min  || mi->w_max != r->opt.w_max || mi->mode != r->opt.mode || (mi->flag&MM_I_HPC) != (r->opt.flag&MM_I_HPC)))
-			fprintf(stderr, "[WARNING]\033[1;31m Indexing parameters (-k, -w, -w_min, -w_max, -mode or -H) overridden by parameters used in the prebuilt index.\033[0m\n");
+		if (mi && mm_verbose >= 2 && (mi->k != r->opt.k || mi->k_min != r->opt.k_min || mi->w != r->opt.w || mi->w_min != r->opt.w_min  || mi->w_max != r->opt.w_max || mi->mode != r->opt.mode || (mi->flag&MM_I_HPC) != (r->opt.flag&MM_I_HPC)))
+			fprintf(stderr, "[WARNING]\033[1;31m Indexing parameters (-k, -k_min, -w, -w_min, -w_max, -mode or -H) overridden by parameters used in the prebuilt index.\033[0m\n");
 	} else
-		mi = mm_idx_gen(r->fp.seq, r->opt.w, r->opt.k, r->opt.bucket_bits, r->opt.flag, r->opt.w_min, r->opt.w_max, r->opt.mode, r->opt.mini_batch_size, n_threads, r->opt.batch_size);
+		mi = mm_idx_gen(r->fp.seq, r->opt.w, r->opt.k, r->opt.k_min, r->opt.bucket_bits, r->opt.flag, r->opt.w_min, r->opt.w_max, r->opt.mode, r->opt.mini_batch_size, n_threads, r->opt.batch_size);
 	if (mi) {
 		if (r->fp_out) mm_idx_dump(r->fp_out, mi);
 		mi->index = r->n_parts++;

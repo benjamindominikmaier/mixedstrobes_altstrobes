@@ -137,7 +137,7 @@ static char *mappy_fetch_seq(const mm_idx_t *mi, const char *name, int st, int e
 	return s;
 }
 
-static mm_idx_t *mappy_idx_seq(int w, int k, int w_min, int w_max, int mode, int is_hpc, int bucket_bits, const char *seq, int len)
+static mm_idx_t *mappy_idx_seq(int w, int k, int k_min, int w_min, int w_max, int mode, int is_hpc, int bucket_bits, const char *seq, int len)
 {
 	const char *fake_name = "N/A";
 	char *s;

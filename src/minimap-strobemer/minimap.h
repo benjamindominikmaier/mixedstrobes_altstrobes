@@ -44,6 +44,7 @@
 #define MM_F_ALT           (0x1000000000LL)
 #define MM_F_MIX           (0x2000000000LL)
 #define MM_F_RAND		   (0x4000000000LL)
+#define MM_F_MULT		   (0x8000000000LL)
 
 #define MM_I_HPC          0x1
 #define MM_I_NO_SEQ       0x2
@@ -82,7 +83,7 @@ typedef struct {
 } mm_idx_seq_t;
 
 typedef struct {
-	int32_t b, w, k, flag, w_min, w_max, mode;
+	int32_t b, w, k, k_min, flag, w_min, w_max, mode;
 	uint32_t n_seq;            // number of reference sequences
 	int32_t index;
 	int32_t n_alt;
@@ -121,7 +122,7 @@ typedef struct {
 
 // indexing and mapping options
 typedef struct {
-	short k, w, flag, w_min, w_max, bucket_bits, mode;
+	short k, k_min, w, flag, w_min, w_max, bucket_bits, mode;
 	int64_t mini_batch_size;
 	uint64_t batch_size;
 } mm_idxopt_t;
@@ -182,7 +183,7 @@ typedef struct {
 
 // index reader
 typedef struct {
-	int is_idx, n_parts, w_min, w_max, mode;
+	int is_idx, n_parts, k_min, w_min, w_max, mode;
 	int64_t idx_size;
 	mm_idxopt_t opt;
 	FILE *fp_out;
@@ -305,7 +306,7 @@ void mm_idx_dump(FILE *fp, const mm_idx_t *mi);
  *
  * @return minimap2 index
  */
-mm_idx_t *mm_idx_str(int w, int k, int w_min, int w_max, int mode, int is_hpc, int bucket_bits, int n, const char **seq, const char **name);
+mm_idx_t *mm_idx_str(int w, int k, int k_min, int w_min, int w_max, int mode, int is_hpc, int bucket_bits, int n, const char **seq, const char **name);
 
 /**
  * Print index statistics to stderr
@@ -405,7 +406,7 @@ int mm_idx_bed_junc(const mm_idx_t *mi, int32_t ctg, int32_t st, int32_t en, uin
 
 // deprecated APIs for backward compatibility
 void mm_mapopt_init(mm_mapopt_t *opt);
-mm_idx_t *mm_idx_build(const char *fn, int w, int k, int flag, int w_min, int w_max, int mode, int n_threads);
+mm_idx_t *mm_idx_build(const char *fn, int w, int k, int k_min, int flag, int w_min, int w_max, int mode, int n_threads);
 
 #ifdef __cplusplus
 }

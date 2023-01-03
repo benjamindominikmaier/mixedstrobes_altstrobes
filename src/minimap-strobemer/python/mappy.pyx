@@ -120,6 +120,7 @@ cdef class Aligner:
 		self.map_opt.flag |= 4 # always perform alignment
 		self.idx_opt.batch_size = 0x7fffffffffffffffL # always build a uni-part index
 		if k is not None: self.idx_opt.k = k
+		if k_min is not None: self.idx_opt.k_min = k_min
 		if w is not None: self.idx_opt.w = w
 		if w_min is not None: self.idx_opt_w_min = w_min
 		if w_max is not None: self.idx_opt_w_max = w_max
@@ -153,7 +154,7 @@ cdef class Aligner:
 				cmappy.mm_mapopt_update(&self.map_opt, self._idx)
 				cmappy.mm_idx_index_name(self._idx)
 		else:
-			self._idx = cmappy.mappy_idx_seq(self.idx_opt.w, self.idx_opt.k, self.idx_opt.w_min, self.idx_opt.w_max, self.idx_opt.mode, self.idx_opt.flag&1, self.idx_opt.bucket_bits, str.encode(seq), len(seq))
+			self._idx = cmappy.mappy_idx_seq(self.idx_opt.w, self.idx_opt.k, self.idx_opt.k_min, self.idx_opt.w_min, self.idx_opt.w_max, self.idx_opt.mode, self.idx_opt.flag&1, self.idx_opt.bucket_bits, str.encode(seq), len(seq))
 			cmappy.mm_mapopt_update(&self.map_opt, self._idx)
 			self.map_opt.mid_occ = 1000 # don't filter high-occ seeds
 

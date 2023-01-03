@@ -163,7 +163,7 @@ void mm_sketch(void *km, const char *str, int len, int w, int k, uint32_t rid, i
  *               and strand indicates whether the minimizer comes from the top or the bottom strand.
  *               Callers may want to set "p->n = 0"; otherwise results are appended to p
  */
-void mm_sketch_altstrobes(void *km, const char *str, int len, int w, int k, int w_min, int w_max, uint32_t rid, int is_hpc, mm128_v *p)
+void mm_sketch_altstrobes(void *km, const char *str, int len, int w, int k, int k_min, int w_min, int w_max, uint32_t rid, int is_hpc, mm128_v *p)
 {
 	uint64_t shift1 = 2 * (k - 1), mask = (1ULL<<2*k) - 1, kmer[2] = {0,0};
 	int i, j, l, buf_pos, buf_temp, buf_temp2, min_pos, kmer_span, strobe_pos_next, w_buf_pos, w_poss, counter = 0;
@@ -486,7 +486,7 @@ void mm_sketch_altstrobes(void *km, const char *str, int len, int w, int k, int 
  *               and strand indicates whether the minimizer comes from the top or the bottom strand.
  *               Callers may want to set "p->n = 0"; otherwise results are appended to p
  */
-void mm_sketch_mixedstrobes(void *km, const char *str, int len, int w, int k, int w_min, int w_max, uint32_t rid, int is_hpc, mm128_v *p)
+void mm_sketch_mixedstrobes(void *km, const char *str, int len, int w, int k, int k_min, int w_min, int w_max, uint32_t rid, int is_hpc, mm128_v *p)
 {
 	uint64_t shift1 = 2 * (k - 1), mask = (1ULL<<2*k) - 1, kmer[2] = {0,0};
 	int i, j, l, buf_pos, buf_temp, buf_temp2, min_pos, kmer_span, strobe_pos_next, w_buf_pos, w_poss, counter = 0;
@@ -739,7 +739,7 @@ void mm_sketch_mixedstrobes(void *km, const char *str, int len, int w, int k, in
  *               and strand indicates whether the minimizer comes from the top or the bottom strand.
  *               Callers may want to set "p->n = 0"; otherwise results are appended to p
  */
-void mm_sketch_randstrobes(void *km, const char *str, int len, int w, int k, int w_min, int w_max, uint32_t rid, int is_hpc, mm128_v *p)
+void mm_sketch_randstrobes(void *km, const char *str, int len, int w, int k, int k_min, int w_min, int w_max, uint32_t rid, int is_hpc, mm128_v *p)
 {
 	uint64_t shift1 = 2 * (k - 1), mask = (1ULL<<2*k) - 1, kmer[2] = {0,0};
 	int i, j, l, buf_pos, buf_temp, buf_temp2, min_pos, kmer_span, strobe_pos_next, w_buf_pos, w_poss, counter = 0;
@@ -927,5 +927,295 @@ void mm_sketch_randstrobes(void *km, const char *str, int len, int w, int k, int
 			++w_buf_pos;
 		}
 	}
+}
 
+
+u_int64_t seq_to_hashvalue_fw(const char *str, int start, int length)
+{
+	uint64_t kmask = (1ULL<<2*length) - 1;
+	uint64_t x = 0;
+    for (int i = start; i < start+length; i++) {
+        int c = seq_nt4_table[(uint8_t) str[i]];
+        if (c < 4) { // not an "N" base
+            x = (x << 2 | c) & kmask;
+            }
+        else {
+            return 0;
+        }
+    }
+    uint64_t hash_k = hash64(x, kmask);
+    return hash_k;
+}
+
+
+u_int64_t seq_to_hashvalue_rev(const char *str, int start, int length)
+{
+	uint64_t kmask = (1ULL<<2*length) - 1;
+	uint64_t kshift = 2 * (length - 1);
+	uint64_t x = 0;
+    for (int i = start-length; i < start; i++) {
+        int c = seq_nt4_table[(uint8_t) str[i]];
+        if (c < 4) { // not an "N" base
+			x = (x >> 2) | (3ULL^c) << kshift;
+            }
+        else {
+            return 0;
+        }
+    }
+    uint64_t hash_k = hash64(x, kmask);
+    return hash_k;
+}
+
+
+/**
+ * Find symmetric (w,k)-minimizers on a DNA sequence
+ *
+ * @param km     thread-local memory pool; using NULL falls back to malloc()
+ * @param str    DNA sequence
+ * @param len    length of $str
+ * @param w      find a minimizer for every $w consecutive k-mers
+ * @param k      k-mer size
+ * @param k_min  minimum k-mer size
+ * @param w_min  minimum strobe offset
+ * @param w_max  maximum strobe offset
+ * @param rid    reference ID; will be copied to the output $p array
+ * @param is_hpc homopolymer-compressed or not
+ * @param p      minimizers
+ *               p->a[i].x = kMer<<8 | kmerSpan
+ *               p->a[i].y = rid<<32 | lastPos<<1 | strand
+ *               where lastPos is the position of the last base of the i-th minimizer,
+ *               and strand indicates whether the minimizer comes from the top or the bottom strand.
+ *               Callers may want to set "p->n = 0"; otherwise results are appended to p
+ */
+void mm_sketch_multistrobes(void *km, const char *str, int len, int w, int k, int k_min, int w_min, int w_max, uint32_t rid, int is_hpc, mm128_v *p)
+{
+	// fprintf(stderr, "k: %d, k_min: %d, w_min: %d, w_max: %d\n\n", 2*k, k_min, w_min, w_max);
+	uint64_t shift1 = 2 * (k_min - 1), mask = (1ULL<<2*k_min) - 1, kmer[2] = {0,0};
+	int i, j, l, k1, offset, buf_pos, buf_temp, buf_temp2, min_pos, kmer_span, strobe_pos_next, w_buf_pos, w_poss, counter = 0;
+	uint64_t hash1 = 0, hash2 = 0;
+	mm128_t buf_fw[256], min = { UINT64_MAX, UINT64_MAX };
+	mm128_t buf_rev[256];
+	tiny_queue_t tq;
+	uint64_t min_val = UINT64_MAX;
+	int w_max_w = 2*w_max + 2*(2*k-k_min)+w;
+	int strobe_len = w_max + k - k_min-1;
+	int strobe_span = 0;
+    int min_start = k+w_max+w;
+	int shift = w_max + k - k_min;
+
+	int w_min_off = w_min - k; // + k1
+	int w_max_off = w_max - k; // + k1
+
+	assert(len > 0 && (w_max_w > 0 && w_max_w < 256) && (k_min > 0) && (k > 0 && k <= 14)); // 56 bits for k-mer; could use long k-mers, but 28 enough in practice
+	memset(buf_fw, 0xff, w_max_w * 16);
+	memset(buf_rev, 0xff, w_max_w * 16);
+	memset(&tq, 0, sizeof(tiny_queue_t));
+	kv_resize(mm128_t, km, *p, p->n + len/w);
+
+	k = 2*k;
+	int nr_options = k-2*k_min+1;
+
+	for (i = l = buf_pos = min_pos = 0; i < len; ++i) {
+		int c = seq_nt4_table[(uint8_t)str[i]];
+		mm128_t info_fw = { UINT64_MAX, UINT64_MAX };
+		mm128_t info_rev = { UINT64_MAX, UINT64_MAX };
+		if (c < 4) { // not an ambiguous base
+			int z;
+			if (is_hpc) {
+				int skip_len = 1;
+				if (i + 1 < len && seq_nt4_table[(uint8_t)str[i + 1]] == c) {
+					for (skip_len = 2; i + skip_len < len; ++skip_len)
+						if (seq_nt4_table[(uint8_t)str[i + skip_len]] != c)
+							break;
+					i += skip_len - 1; // put $i at the end of the current homopolymer run
+				}
+				tq_push(&tq, skip_len);
+				kmer_span += skip_len;
+				if (tq.count > k_min) kmer_span -= tq_shift(&tq);
+			} else kmer_span = l + 1 < k_min? l + 1 : k_min;
+			kmer[0] = (kmer[0] << 2 | c) & mask;           // forward k-mer
+			kmer[1] = (kmer[1] >> 2) | (3ULL^c) << shift1; // reverse k-mer
+			// if (kmer[0] == kmer[1]) continue; // skip "symmetric k-mers" as we don't know it strand
+			// z = kmer[0] < kmer[1]? 0 : 1; // strand
+			++l;
+			if (l >= k_min && kmer_span < 256) {
+				info_fw.x = hash64(kmer[0], mask); // << 8 | kmer_span;
+				// info_fw.y = (uint64_t)rid<<32 | (uint32_t)i<<1 | 0;
+				info_rev.x = hash64(kmer[1], mask); // << 8 | kmer_span;
+				// info_rev.y = (uint64_t)rid<<32 | (uint32_t)i<<1 | 1;
+			}
+		} else l = 0, tq.count = tq.front = 0, kmer_span = 0;
+		buf_fw[buf_pos] = info_fw; // need to do this here as appropriate buf_pos and buf[buf_pos] are needed below
+		buf_rev[buf_pos] = info_rev; // need to do this here as appropriate buf_pos and buf[buf_pos] are needed below
+
+		if (l >= min_start){
+			// fprintf(stderr, "Buf_pos: %d, w_buf %d, Min: %d, Fwd: %d, Rev: %d\n", buf_pos, w_buf_pos, min.x, buf_fw[(buf_pos+1+w)%w_max_w].x, info_rev.x);
+			buf_temp = (w_max_w+buf_pos-shift)%w_max_w;
+			if ((buf_fw[buf_temp].x <= min.x) && (buf_fw[buf_temp].x <= buf_rev[buf_temp].x)){
+				k1 = k_min + buf_fw[buf_temp].x % nr_options;
+				min_val = UINT64_MAX;
+				hash1 = seq_to_hashvalue_fw(str, i-shift-k_min+1, k1);
+				int offset = w_min_off+k1;
+				for (j = w_min_off+buf_temp+k1; j < w_max_off+buf_temp+k1; j++){
+					uint64_t res = hash1 ^ buf_fw[j%w_max_w].x;
+					if (res < min_val){
+						min_val = res;
+						// strobe_pos_next = j;
+						hash2 = offset;
+					}
+					++offset;
+				}
+				hash2 = seq_to_hashvalue_fw(str, hash2+i-shift-k_min+1, k-k1);
+				info_fw.x = ((hash1 << (2*k1)) ^ hash2) << 8 | strobe_len;
+				info_fw.y = (uint64_t)rid<<32 | (uint32_t)i<<1 | 0;
+				kv_push(mm128_t, km, *p, info_fw);
+				w_buf_pos = 0;
+				min = buf_fw[buf_temp];
+			}
+			else if ((buf_rev[buf_temp].x <= min.x) && (l >= min_start+w_max)) {
+				k1 = k_min + buf_rev[buf_temp].x % nr_options;
+				hash1 = seq_to_hashvalue_rev(str, i-shift+1, k1);
+				min_val = UINT64_MAX;
+				int offset = w_max_w-w_min_off-k1;
+				for (j = w_max_w+buf_temp-w_min_off-k1; j > w_max_w+buf_temp-w_max_off-k1; j--){
+					uint64_t res = hash1 ^ buf_rev[j%w_max_w].x;
+					if (res < min_val){
+						min_val = res;
+						// strobe_pos_next = j;
+						hash2 = offset;
+					}
+					--offset;
+				}
+				hash2 = seq_to_hashvalue_rev(str, hash2-w_max_w+i-shift+1, k-k1);
+				info_rev.x = ((hash1 << (2*k1)) ^ hash2) << 8 | strobe_len;
+				info_rev.y = (uint64_t)rid<<32 | (uint32_t)(i-shift)<<1 | 1;
+				kv_push(mm128_t, km, *p, info_rev);
+				w_buf_pos = 0;
+				min = buf_rev[buf_temp];
+			}
+
+			if (++w_buf_pos == w){  // old min has moved outside the window
+				// fprintf(stderr, "Moved outside window\n");
+				min.x = UINT64_MAX;
+                buf_temp = w_max_w+buf_pos-shift;
+				for (w_poss = (w-2); w_poss >= 0; --w_poss){
+					// fprintf(stderr, "\tw_poss: %d, Fwd: %d, Rev: %d\n", w_poss, buf_fw[(buf_temp-w_poss)%w_max_w].x, buf_rev[(w_max_w+buf_pos-w_poss)%w_max_w].x);
+					if (buf_fw[(buf_temp-w_poss)%w_max_w].x < min.x){
+						w_buf_pos = w_poss;
+						min = buf_fw[(buf_temp-w_poss)%w_max_w];
+					}
+					if ((buf_rev[(buf_temp-w_poss)%w_max_w].x < min.x) && (l >= min_start+w_max+k_min)){
+						w_buf_pos = w_poss;
+						min = buf_rev[(buf_temp-w_poss)%w_max_w];
+					}
+				}
+				for (w_poss = (w-2); w_poss >= 0; --w_poss){
+					if (buf_fw[(buf_temp-w_poss)%w_max_w].x == min.x){
+						buf_temp2 = (buf_temp - w_poss)%w_max_w;
+						k1 = k_min + buf_fw[buf_temp2].x % nr_options;
+						hash1 = seq_to_hashvalue_fw(str, i-w_poss-shift-k_min+1, k1);
+						min_val = UINT64_MAX;
+						int offset = w_min_off+k1;
+						for (j = w_min_off+buf_temp2+k1; j < w_max_off+buf_temp2+k1; j++){
+							uint64_t res = hash1 ^ buf_fw[j%w_max_w].x;
+							if (res < min_val){
+								min_val = res;
+								// strobe_pos_next = j;
+								hash2 = offset;
+							}
+							++offset;
+						}
+						hash2 = seq_to_hashvalue_fw(str, hash2+i-w_poss-shift-k_min+1, k-k1);
+						info_fw.x = ((hash1 << (2*k1)) ^ hash2) << 8 | strobe_len;
+						info_fw.y = (uint64_t)rid<<32 | (uint32_t)(i-w_poss)<<1 | 0;
+						kv_push(mm128_t, km, *p, info_fw);
+					}
+					if ((buf_rev[(buf_temp-w_poss)%w_max_w].x == min.x) && (l >= min_start+w_max+k_min)) {
+						buf_temp2 = (buf_temp - w_poss)%w_max_w;
+						k1 = k_min + buf_rev[buf_temp2].x % nr_options;
+						hash1 = seq_to_hashvalue_rev(str, i-w_poss-shift+1, k1);
+						min_val = UINT64_MAX;
+						int offset = w_max_w-w_min_off-k1;
+						for (j = w_max_w+buf_temp2-w_min_off-k1; j > w_max_w+buf_temp2-w_max_off-k1; j--){
+							uint64_t res = hash1 ^ buf_rev[j%w_max_w].x;
+							if (res < min_val){
+								min_val = res;
+								// strobe_pos_next = j;
+								hash2 = offset;
+							}
+							--offset;
+						}
+						hash2 = seq_to_hashvalue_rev(str, hash2-w_max_w+i-w_poss-shift+1, k-k1);
+						info_rev.x = ((hash1 << (2*k1)) ^ hash2) << 8 | strobe_len;
+						info_rev.y = (uint64_t)rid<<32 | (uint32_t)(i-shift-w_poss)<<1 | 1;
+						kv_push(mm128_t, km, *p, info_rev);
+					}
+				}
+				++w_buf_pos;
+			}
+		}
+		if (++buf_pos == w_max_w) buf_pos = 0;
+	}
+    // compute rev minimizers on last w_max pos:
+	mm128_t info_rev = { UINT64_MAX, UINT64_MAX };
+	counter = 0;
+	for (buf_temp = (w_max_w+buf_pos-shift); buf_temp < (w_max_w+buf_pos); ++buf_temp){
+		++counter;
+		buf_temp2 = buf_temp%w_max_w;
+		if (buf_rev[buf_temp2].x <= min.x) {
+			k1 = k_min + buf_rev[buf_temp2].x % nr_options;
+			hash1 = seq_to_hashvalue_rev(str, i+counter-shift, k1);
+			min_val = UINT64_MAX;
+			int offset = w_max_w-w_min_off-k1;
+			for (j = w_max_w+buf_temp2-w_min_off-k1; j > w_max_w+buf_temp2-w_max_off-k1; j--){
+				uint64_t res = hash1 ^ buf_rev[j%w_max_w].x;
+				if (res < min_val){
+					min_val = res;
+					// strobe_pos_next = j;
+					hash2 = offset;
+				}
+				--offset;
+			}
+			hash2 = seq_to_hashvalue_rev(str, hash2-w_max_w+i+counter-shift, k-k1);
+			info_rev.x = ((hash1 << (2*k1)) ^ hash2) << 8 | strobe_len;
+			info_rev.y = (uint64_t)rid<<32 | (uint32_t)(i-shift+counter-1)<<1 | 1;
+			kv_push(mm128_t, km, *p, info_rev);
+			w_buf_pos = 0;
+			min = buf_rev[buf_temp2];
+		}
+		if (++w_buf_pos == w){  // old min has moved outside the window
+			// fprintf(stderr, "Moved outside window\n");
+			min.x = UINT64_MAX;
+			for (w_poss = (w-2); w_poss >= 0; --w_poss){
+				// fprintf(stderr, "\tw_poss: %d, Fwd: %d, Rev: %d\n", w_poss, buf_fw[(buf_temp-w_poss)%w_max_w].x, buf_rev[(w_max_w+buf_pos-w_poss)%w_max_w].x);
+				if (buf_rev[(buf_temp-w_poss)%w_max_w].x < min.x){
+					w_buf_pos = w_poss;
+					min = buf_rev[(buf_temp-w_poss)%w_max_w];
+				}
+			}
+			for (w_poss = (w-2); w_poss >= 0; --w_poss){
+				if (buf_rev[(buf_temp-w_poss)%w_max_w].x == min.x) {
+					buf_temp2 = (buf_temp - w_poss)%w_max_w;
+					k1 = k_min + buf_rev[buf_temp2].x % nr_options;
+					hash1 = seq_to_hashvalue_rev(str, i+counter-w_poss-shift, k1);
+					min_val = UINT64_MAX;
+					int offset = w_max_w-w_min_off-k1;
+					for (j = w_max_w+buf_temp2-w_min_off-k1; j > w_max_w+buf_temp2-w_max_off-k1; j--){
+						uint64_t res = hash1 ^ buf_rev[j%w_max_w].x;
+						if (res < min_val){
+							min_val = res;
+							// strobe_pos_next = j;
+							hash2 = offset;
+						}
+						--offset;
+					}
+					hash2 = seq_to_hashvalue_rev(str, hash2-w_max_w+i+counter-w_poss-shift, k-k1);
+					info_rev.x = ((hash1 << (2*k1)) ^ hash2) << 8 | strobe_len;
+					info_rev.y = (uint64_t)rid<<32 | (uint32_t)(i-shift-w_poss+counter-1)<<1 | 1;
+					kv_push(mm128_t, km, *p, info_rev);
+				}
+			}
+			++w_buf_pos;
+		}
+	}
 }

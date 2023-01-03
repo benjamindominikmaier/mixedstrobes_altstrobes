@@ -68,11 +68,13 @@ static void collect_minimizers(void *km, const mm_mapopt_t *opt, const mm_idx_t 
 	for (i = n = 0; i < n_segs; ++i) {
 		size_t j;
 		if (mi->mode == 2){
-			mm_sketch_altstrobes(km, seqs[i], qlens[i], mi->w, mi->k, mi->w_min, mi->w_max, i, mi->flag&MM_I_HPC, mv);
+			mm_sketch_altstrobes(km, seqs[i], qlens[i], mi->w, mi->k, mi->k_min, mi->w_min, mi->w_max, i, mi->flag&MM_I_HPC, mv);
 		} else if (mi->mode == 1){
-			mm_sketch_mixedstrobes(km, seqs[i], qlens[i], mi->w, mi->k, mi->w_min, mi->w_max, i, mi->flag&MM_I_HPC, mv);
+			mm_sketch_mixedstrobes(km, seqs[i], qlens[i], mi->w, mi->k, mi->k_min, mi->w_min, mi->w_max, i, mi->flag&MM_I_HPC, mv);
 		} else if (mi->mode == 3){
-			mm_sketch_randstrobes(km, seqs[i], qlens[i], mi->w, mi->k, mi->w_min, mi->w_max, i, mi->flag&MM_I_HPC, mv);
+			mm_sketch_randstrobes(km, seqs[i], qlens[i], mi->w, mi->k, mi->k_min, mi->w_min, mi->w_max, i, mi->flag&MM_I_HPC, mv);
+		} else if (mi->mode == 4){
+			mm_sketch_multistrobes(km, seqs[i], qlens[i], mi->w, mi->k, mi->k_min, mi->w_min, mi->w_max, i, mi->flag&MM_I_HPC, mv);
 		} else {
 			mm_sketch(km, seqs[i], qlens[i], mi->w, mi->k, i, mi->flag&MM_I_HPC, mv);
 		}

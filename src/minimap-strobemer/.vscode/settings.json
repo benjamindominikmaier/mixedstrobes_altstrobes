@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "*.tcc": "c",
+        "random": "c",
+        "limits": "c"
+    }
+}
