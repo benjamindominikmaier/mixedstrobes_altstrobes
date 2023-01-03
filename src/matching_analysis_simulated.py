@@ -327,6 +327,63 @@ def analyze_altstrobes_generalized(seq1: str, seq2: str, k_size1: int,
     return m, mp, len(sc_pos), len(mc_pos), gaps
 
 
+def analyze_multistrobes(seq1: str, seq2: str, k_size: int, order: int, w: int,
+                         w_low: int = 0, w_high: int = 50, fraction: float = 0.5,
+                         k_boundary: int=5, arg: int=50) -> tuple:
+    """
+    Computes number of matches, fraction of matches, sequence coverage,
+    match coverage and expected island size for generated altstrobe seeds
+
+    :param seq1: a string with a nucleotide sequence which is compared to seq2
+    :param seq2: a string with a nucleotide sequence which is compared to seq1
+    :param k_size: length of all strobes/substrings (len(strobe_1) +  ... + len(strobe_n))
+    :param order: number of substrings/strobes
+    :param hash_fcn: a string with the function name of the kmer/strobemer protocol
+    :param w: number of hashes used in a sliding window for thinning (w=1 means no thinning)
+    :param w_low: minimum window offset to the previous window (wMin > 0)
+    :param w_high: maximum window offset to the previous window (wMin <= wMax)
+    :param fraction: a fraction of sampled strobemers, rest kmers (0 <= strobe_fraction <= 1)
+    :returns: number of matches (int), fraction of matches (float),
+              sequence coverage (float), gap lengths (list), match coverage (float)
+    """
+    multistrobes1 = indexing.multistrobes(seq1, k_size, w_low, w_high, w, order, k_boundary=k_boundary, arg=arg)
+    multistrobes2 = indexing.multistrobes(seq2, k_size, w_low, w_high, w, order, k_boundary=k_boundary, arg=arg)
+
+    matches = set(multistrobes1.values()) & (set(multistrobes2.values()))
+
+    m = len(matches)
+    mp = len(multistrobes1.values())
+
+    hash_values_tmp = list(multistrobes1.values())
+    hash_values = collections.Counter(hash_values_tmp)
+
+    multistrobe_positions = [key for key, value in multistrobes1.items() if value in matches]
+
+    # stat = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0, 20: 0, 21: 0, 22: 0, 23: 0, 24: 0, 25: 0}
+    # for x in multistrobe_positions:
+    #     s1 = len(x[0])
+    #     s2 = len(x[1])
+    #     assert order*(s1 + s2)/2 == k_size; "[Error] " + str(s1) + str(s2)
+    #     stat[s1] += 1
+    # print(stat)
+
+    sc_pos = []
+    mc_pos = []
+
+    for x in multistrobe_positions:
+        for elem in x:
+            sc_pos.append(elem)
+        mc_pos.append(range(min(x[0]), max(x[-1])+1))
+
+
+    sc_pos = set(chain.from_iterable(sc_pos))
+    mc_pos = set(chain.from_iterable(mc_pos))
+    gap_pos = [pos for pos in range(len(seq1)) if pos not in mc_pos]
+    gaps = gap_finder(gap_pos)
+
+    return m, mp, len(sc_pos), len(mc_pos), gaps
+
+
 def analyze_kmers(seq1: str, seq2: str, k_size: int, w: int) -> tuple:
     """
     Computes number of matches, fraction of matches, sequence coverage,
@@ -388,7 +445,7 @@ def analyze_spaced_kmers(seq1: str, seq2: str, k_size: int, span_size: int, w: i
 
 def analyze_altstrobes(seq1: str, seq2: str, k_size: int, order: int,
                        hash_fcn: str, w: int, w_low: int = 0, w_high: int = 50,
-                       fraction: float = 0.5) -> tuple:
+                       fraction: float = 0.5, arg: int = 50) -> tuple:
     """
     Computes number of matches, fraction of matches, sequence coverage,
     match coverage and expected island size for generated altstrobe seeds
@@ -408,10 +465,10 @@ def analyze_altstrobes(seq1: str, seq2: str, k_size: int, order: int,
     """
 
     assert k_size % int(1.5*order) == 0, "Not even kmer length, results will be different"
-    altstrobes1 = indexing.altstrobes(seq1, k_size, w_low, w_high, w, order)
-    altstrobes2 = indexing.altstrobes(seq2, k_size, w_low, w_high, w, order)
+    altstrobes1 = indexing.altstrobes(seq1, k_size, w_low, w_high, w, order, arg=arg)
+    altstrobes2 = indexing.altstrobes(seq2, k_size, w_low, w_high, w, order, arg=arg)
 
-    order = order+1
+    order = 1.5*order
 
     matches = set(altstrobes1.values()) & set(altstrobes2.values())
     m = len(matches)
@@ -449,7 +506,7 @@ def analyze_mixedaltstrobes(seq1: str, seq2: str, k_size: int, order: int,
     altstrobes1 = indexing.mixedaltstrobes(seq1, k_size, w_low, w_high, w, order, fraction)
     altstrobes2 = indexing.mixedaltstrobes(seq2, k_size, w_low, w_high, w, order, fraction)
 
-    order = order+1  # increase order by 1 as information about short-long combination requires one extra order
+    order = 1.5*order  # increase order by 1 as information about short-long combination requires one extra order
 
     matches = set(altstrobes1.values()) & set(altstrobes2.values())
     m = len(matches)
@@ -532,11 +589,13 @@ def main(args):
     """
 
     for mut_freq in args.mut_freqs:
+        if args.experiment_type == "specified":
+            print("EXPERIMENT TYPE: specified ({0}% subs)".format(100*args.subs_freq))
         print("MUTATION RATE:", mut_freq)
         results = dict()
 
         for exp_id in range(args.nr_exp):
-            if exp_id % 100 == 0:
+            if ((args.verbose) & (exp_id % 100 == 0)):
                 print("Analyzed {0} simulated experiments". format(exp_id))
 
             seq1 = "".join([random.choice("ACGT") for i in range(args.L)])
@@ -564,6 +623,16 @@ def main(args):
                     else random.choice(['', help_functions.reverse_complement(seq1[i]), seq1[i] + random.choice("ACGT")])
                     for i in range(len(seq1))
                 ])
+            elif args.experiment_type == 'specified':
+                muts = set(random.sample(range(len(seq1)), int(args.L*mut_freq)))
+                subs = set(random.sample(muts, int(len(muts)*args.subs_freq)))
+                seq2 = "".join([
+                    seq1[i] if i not in muts
+                    else random.choice([help_functions.reverse_complement(seq1[i])]) if i in subs
+                    else random.choice(['', seq1[i] + random.choice("ACGT")])
+                    for i in range(len(seq1))
+                ])
+
             else:
                 print("Wrong experiment label specified")
                 sys.exit()
@@ -596,6 +665,18 @@ def main(args):
                     results["spaced_kmers_sparse"]["mc"] += match_coverage
                     results["spaced_kmers_sparse"]["mp"] += mp
 
+                elif hash_fcn == "altstrobes_size_distribution":
+                    results.setdefault("altstrobes_size_distribution", dict())
+                    for order in args.orders:
+                        for fraction in args.strobe_fractions:
+                            results["altstrobes_size_distribution"].setdefault((order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high, fraction), {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
+                            m, mp, sc, gaps, all_pos_vector, match_coverage = analyze_altstrobes(seq1, seq2, args.k_size, order, hash_fcn, args.w, w_low=args.w_low, w_high=args.w_high, arg=100*fraction)
+                            results["altstrobes_size_distribution"][(order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high, fraction)]["m"] += m
+                            results["altstrobes_size_distribution"][(order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high, fraction)]["sc"] += sc
+                            results["altstrobes_size_distribution"][(order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high, fraction)]["gaps"].append(gaps)
+                            results["altstrobes_size_distribution"][(order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high, fraction)]["mc"] += match_coverage
+                            results["altstrobes_size_distribution"][(order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high, fraction)]["mp"] += mp
+
                 elif hash_fcn == "altstrobes":
                     results.setdefault("altstrobes", dict())
                     for order in args.orders:
@@ -622,13 +703,35 @@ def main(args):
                     results.setdefault(hash_fcn, dict())
                     for order in args.orders:
                         for fraction in args.strobe_fractions:
-                            results["mixedaltstrobes"].setdefault((order, args.k_size//order, args.w_low, args.w_high, fraction), {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
+                            results["mixedaltstrobes"].setdefault((order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high, fraction), {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
                             m, mp, sc, gaps, all_pos_vector, match_coverage = analyze_mixedaltstrobes(seq1, seq2, args.k_size, order, hash_fcn, args.w, w_low=args.w_low, w_high=args.w_high, fraction=fraction)
-                            results["mixedaltstrobes"][(order, args.k_size//order, args.w_low, args.w_high, fraction)]["m"] += m
-                            results["mixedaltstrobes"][(order, args.k_size//order, args.w_low, args.w_high, fraction)]["sc"] += sc
-                            results["mixedaltstrobes"][(order, args.k_size//order, args.w_low, args.w_high, fraction)]["gaps"].append(gaps)
-                            results["mixedaltstrobes"][(order, args.k_size//order, args.w_low, args.w_high, fraction)]["mc"] += match_coverage
-                            results["mixedaltstrobes"][(order, args.k_size//order, args.w_low, args.w_high, fraction)]["mp"] += mp
+                            results["mixedaltstrobes"][(order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high, fraction)]["m"] += m
+                            results["mixedaltstrobes"][(order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high, fraction)]["sc"] += sc
+                            results["mixedaltstrobes"][(order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high, fraction)]["gaps"].append(gaps)
+                            results["mixedaltstrobes"][(order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high, fraction)]["mc"] += match_coverage
+                            results["mixedaltstrobes"][(order, (2*args.k_size)//(3*order), (4*args.k_size)//(3*order), args.w_low, args.w_high, fraction)]["mp"] += mp
+
+                elif hash_fcn == "multistrobes":
+                    results.setdefault(hash_fcn, dict())
+                    for order in args.orders:
+                        results["multistrobes"].setdefault((order, args.k_size, args.k_boundary, int(2*args.k_size/order-args.k_boundary), args.w_low, args.w_high, 1), {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
+                        m, mp, sc, match_coverage, gaps = analyze_multistrobes(seq1, seq2, args.k_size, order, args.w, w_low=args.w_low, w_high=args.w_high, k_boundary=args.k_boundary)
+                        results["multistrobes"][(order, args.k_size, args.k_boundary, int(2*args.k_size/order-args.k_boundary), args.w_low, args.w_high, 1)]["m"] += m
+                        results["multistrobes"][(order, args.k_size, args.k_boundary, int(2*args.k_size/order-args.k_boundary), args.w_low, args.w_high, 1)]["sc"] += sc
+                        results["multistrobes"][(order, args.k_size, args.k_boundary, int(2*args.k_size/order-args.k_boundary), args.w_low, args.w_high, 1)]["gaps"].append(gaps)
+                        results["multistrobes"][(order, args.k_size, args.k_boundary, int(2*args.k_size/order-args.k_boundary), args.w_low, args.w_high, 1)]["mc"] += match_coverage
+                        results["multistrobes"][(order, args.k_size, args.k_boundary, int(2*args.k_size/order-args.k_boundary), args.w_low, args.w_high, 1)]["mp"] += mp
+
+                elif hash_fcn == "multistrobes_size_distribution":
+                    results.setdefault("multistrobes_size_distribution", dict())
+                    for fraction in args.strobe_fractions:
+                        results["multistrobes_size_distribution"].setdefault((2, args.k_size, args.w_low, args.w_high, fraction), {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0})
+                        m, mp, sc, match_coverage, gaps = analyze_multistrobes(seq1, seq2, args.k_size, 2, args.w, w_low=args.w_low, w_high=args.w_high, k_boundary=args.k_boundary, arg=100*fraction)
+                        results["multistrobes_size_distribution"][(2, args.k_size, args.w_low, args.w_high, fraction)]["m"] += m
+                        results["multistrobes_size_distribution"][(2, args.k_size, args.w_low, args.w_high, fraction)]["sc"] += sc
+                        results["multistrobes_size_distribution"][(2, args.k_size, args.w_low, args.w_high, fraction)]["gaps"].append(gaps)
+                        results["multistrobes_size_distribution"][(2, args.k_size, args.w_low, args.w_high, fraction)]["mc"] += match_coverage
+                        results["multistrobes_size_distribution"][(2, args.k_size, args.w_low, args.w_high, fraction)]["mp"] += mp
 
                 elif hash_fcn == "mixedstrobes":
                     results.setdefault(hash_fcn, dict())
@@ -680,7 +783,7 @@ def main(args):
                     100*results[protocol]["mc"]/(args.L*args.nr_exp),
                     e_size
                 ]
-                print(protocol, " & ".join([str(round(r, 1)) for r in res]))
+                print(protocol, " & ", args.orders[0], " & - & 0 &", " & ".join([str(round(r, 1)) for r in res]), " & ", mut_freq)
             else:
                 for params in results[protocol]:
                     # print(results[protocol])
@@ -719,19 +822,25 @@ if __name__ == '__main__':
     parser.add_argument('--L', type=int, default=10000, help='Length of simulated sequences')
     parser.add_argument('--nr_exp', type=int, default=1000, help='Number of simulated experiments')
     parser.add_argument('--experiment_type', type=str, default="all", help='experiment type choose between "all", "controlled or "only_subs"')
-    parser.add_argument('--mut_freqs', type=list, default=[0.01, 0.05, 0.10], help='mutation frequencies [0,1]')
+    parser.add_argument('--subs_freq', type=float, default=0.33, help='substitution frequency among all mutations; rest split evenly in insertions and deletions')
+    parser.add_argument('--mut_freqs', nargs='+', type=float, default=[0.01, 0.05, 0.10], help='mutation frequencies [0,1]')
     parser.add_argument('--k_size', type=int, default=30, help='k-mer/strobemer length')
     parser.add_argument('--w', type=int, default=1, help='number of hashes used in a sliding window for thinning (w=1 means no thinning)')
-    parser.add_argument('--orders', type=list, default=[2, ], help='List with orders of strobes to be analzyed')
+    #parser.add_argument('--orders', type=list, default=[4, ], help='List with orders of strobes to be analzyed')
+    parser.add_argument('--orders', nargs='+', type=int, default=[2, ], help='List with orders of strobes to be analzyed')
     parser.add_argument('--w_low', type=int, default=25, help='minimum window offset to the previous window (wMin > 0)')
     parser.add_argument('--w_high', type=int, default=50, help='maximum window offset to the previous window (wMin <= wMax)')
-    parser.add_argument('--strobe_fractions', type=list, default=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9], help='Fraction of sampled strobemers, rest kmers')
+    parser.add_argument('--strobe_fractions', nargs='+', type=float, default=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9], help='Fraction of sampled strobemers, rest kmers')
     parser.add_argument('--all_methods', action="store_true", help='perform matching analysis on simulated data for all (mixed-)strobemer and (mixed-)altstrobe seeding techniques')
     parser.add_argument('--method', type=str, default="none", help='choose seeding technique')
     parser.add_argument('--altstrobes_generalized', action="store_true", help='perform matching analysis on simulated data for altstrobes of all combinations from (1,k-1) to (k/2,k/2)')
+    parser.add_argument('--altstrobes_size_distribution', action="store_true", help='perform matching analysis on simulated data for altstrobes with strobe size distribution (k_s, k_l) determined by strobe_fraction')
+    parser.add_argument('--multistrobes', action="store_true", help='perform matching analysis on simulated data for multistrobes of all combinations from (k_boundary,k-k_boundary) to (k/2,k/2)')
+    parser.add_argument('--multistrobes_size_distribution', action="store_true", help='perform matching analysis on simulated data for multistrobes of all combinations from (k_boundary,k-k_boundary) to (k/2,k/2) with strobe size distribution (k_s, k_l) determined by strobe_fraction')
     parser.add_argument('--k_boundary', type=int, default=5, help='minimum strobe length (k >= 4 recommended to ensure uniqueness)')
     parser.add_argument('--mixedstrobes', action="store_true", help='perform matching analysis on simulated data for user defined mixed seeding techniques')
     parser.add_argument('--mixedstrobes_methods', type=list, default=["randstrobes", "kmers"], help='List with two seeding methods to sample mixedstrobes')
+    parser.add_argument('--verbose', action="store_true")
     args = parser.parse_args()
 
     if len(sys.argv) == 1:
@@ -746,6 +855,12 @@ if __name__ == '__main__':
     if args.altstrobes_generalized:
         args.methods = ("altstrobes_generalized",)
         args.strobe_lengths = [(k1, args.k_size-k1) for k1 in range(1, int(args.k_size/2)+1)]
+    elif args.multistrobes:
+        args.methods = ("multistrobes",)
+    elif args.altstrobes_size_distribution:
+        args.methods = ("altstrobes_size_distribution",)
+    elif args.multistrobes_size_distribution:
+        args.methods = ("multistrobes_size_distribution",)
     elif args.mixedstrobes:
         args.methods = ("mixedstrobes",)
         args.method1 = args.mixedstrobes_methods[0]
