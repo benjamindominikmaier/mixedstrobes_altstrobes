@@ -350,6 +350,40 @@ def build_altstrobe_index(refs, k_size1: int, k_size2: int,
     return idx, ref_id_to_accession, cntr
 
 
+def build_multistrobe_index(refs, k_size: int,
+                          strobe_w_min_offset: int, strobe_w_max_offset: int,
+                          prime: int, w: int, order: int, k_boundary: int) -> tuple:
+    """
+    Build multistrobes from references
+
+    :param method: string which specifies whether minstrobes or randstrobes should be sampled
+    :param refs: reference fasta file
+    :param k_size: length of all strobes combined
+    :param strobe_w_min_offset: minimum window offset to the previous window (wMin > 0)
+    :param strobe_w_max_offset: maximum window offset to the previous window (wMin <= wMax)
+    :param prime: rime number (q) in minimizing h(m)+h(mj) mod q
+    :param w: number of hashes used in a sliding window for thinning (w=1 means no thinning)
+    :param order: number of substrings/strobes
+    :param k_boundary: minimum strobe length (k >= 4 recommended to ensure uniqueness)
+    :returns: a tuple with an index-dictionary, a reference-to-accession-number dictionary and a counter of strobemers created from references
+    """
+    idx = defaultdict(lambda: [])
+    ref_id_to_accession = {}
+    cntr = 0
+
+    for r_id, (ref_acc, (seq, _)) in enumerate(help_functions.readfq(refs)):
+        ref_id_to_accession[r_id] = ref_acc
+        for positions, hash_val in indexing.seq_to_multistrobes_iter(seq, k_size, strobe_w_min_offset, strobe_w_max_offset, prime, w, order, k_boundary):
+            idx[hash_val].append(r_id)
+            for pos in range(len(positions)):
+                idx[hash_val].append(positions[pos])
+            cntr += 1
+            if cntr % 1000000 == 0:
+                print("{0} multistrobes created from references".format(cntr))
+        # print(hash_val, r_id, pos)
+    return idx, ref_id_to_accession, cntr
+
+
 def build_mixedaltstrobe_index(refs, k_size1: int, k_size2: int, strobe_w_min_offset: int, strobe_w_max_offset: int,
                           prime: int, w: int, order: int,
                           denominator: int, numerator: int) -> tuple:
@@ -502,7 +536,7 @@ def get_unmerged_matches(strobes: list, idx: dict, k: int,
     # iterate over query in ascending order and check if hash value in reference
     for q_start, q_end, h in matches_query(strobes, idx, k):
         for r_id, *r_positions in grouper(idx[h], order+1):
-            matches.append((r_id, r_positions[0] + 1, q_start, r_positions[-1] - r_positions[0] + k))
+            matches.append((r_id, r_positions[0] + 1, q_start, r_positions[-1] - r_positions[0] + k, k, k))
     return sorted(matches, key=lambda x: (x[0], x[2], x[1]))
 
 
@@ -524,11 +558,44 @@ def get_unmerged_matches_altstrobes(strobes: list, idx: dict, k: int,
     matches = []
     # iterate over query in ascending order and check if hash value in reference
     for q_start, q_end, h in matches_query(strobes, idx, k):
-        for r_id, *r_positions in grouper(idx[h], order+1):
-            # matches.append((r_id, r_positions[0] + 1, q_start, r_positions[-1] - r_positions[0] + k))
-            matches.append((r_id, r_positions[0] + 1, q_start, r_positions[1] - r_positions[0] + k))
-            matches.append((r_id, r_positions[1] + 1, q_start + r_positions[1]-r_positions[0], r_positions[-1] - r_positions[1] + k))
+        for r_id, *r_positions in grouper(idx[h], int(1.5*order)+1):
+            if r_positions[0] + k == r_positions[1]:
+                matches.append((r_id, r_positions[0] + 1, q_start, r_positions[-1] - r_positions[0] + k, 2*k, k))
+            elif r_positions[1] + k == r_positions[2]:
+                matches.append((r_id, r_positions[0] + 1, q_start, r_positions[-1] - r_positions[0] + k, k, 2*k))
+            else:
+                raise ValueError
+
     return sorted(matches, key=lambda x: (x[0], x[2], x[1]))
+
+
+def get_unmerged_matches_multistrobes(strobes: list, idx: dict, k: int,
+                                              ref_id_to_accession: dict, acc,
+                                              selfalign: bool, order: int, k_boundary: int) -> list:
+    """
+    It is seriously advised to merge matches as the files can become huge otherwise and fill up all diskspace.
+
+    :param strobes: list of kmers/strobemers with (positions, hash_values) for each sampled kmer/strobemer
+    :param idx: a dictionary with reference indexes
+    :param k: strobe size
+    :param ref_id_to_accession: dictionary with references and accession numbers
+    :param acc: accession number
+    :param selfalign: aligns sequences to itself (mainly for bugfixing)
+    :param order: number of substrings/strobes
+    :returns: sorted list of (merged) matches
+    """
+    matches = []
+    # iterate over query in ascending order and check if hash value in reference
+    for q_positions, h in strobes:
+        if h in idx:
+            # extract query start and end position
+            q_start = q_positions[0][0] + 1
+            q_end = q_positions[-1][-1] + 2
+            for r_id, *r_positions in grouper(idx[h], order+1):
+                matches.append((r_id, r_positions[0][0] + 1, q_start, r_positions[-1][-1] - r_positions[0][0] + 2, len(q_positions[0]), len(q_positions[-1])))  # whole seed
+
+
+    return sorted(matches, key=lambda x: (x[0], x[2], x[1], x[4]))
 
 
 def get_merged_matches(strobes: list, idx: dict, k: int, ref_id_to_accession: dict,
@@ -627,23 +694,24 @@ def print_matches_to_file(query_matches: list, ref_id_to_accession: dict,
             outfile.write("> {0} Reverse\n".format(q_acc))
         else:
             outfile.write("> {0}\n".format(q_acc))
-        for (r_id, ref_p, q_pos, k) in read_matches:
+
+        for (r_id, ref_p, q_pos, k, len1, len2) in read_matches:
                 ref_acc = ref_id_to_accession[r_id]
-                outfile.write("  {0} {1} {2} {3}\n".format(ref_acc, ref_p, q_pos, k))
+                outfile.write("  {0} {1} {2} {3} {4} {5}\n".format(ref_acc, ref_p, q_pos, k, len1, len2))
 
 
-def get_sequence_coverage(positions, k_len):
+def get_sequence_coverage(positions):
     covered_bases = 0
 
     if len(positions) == 0:
         return 0
 
-    prev_p = positions[0]
-    covered_bases += k_len  # for first pos
+    prev_p = positions[0][0]
+    covered_bases += positions[0][1]  # for first pos
     if len(positions) == 1:
         return covered_bases
 
-    for p in positions[1:]:
+    for p, k_len in positions[1:]:
         if p <= prev_p + k_len - 1:
             covered_bases += p-prev_p
         else:
@@ -705,8 +773,11 @@ def main(args):
         idx, ref_id_to_accession, cntr = build_hybridstrobe_index(open(args.references, 'r'), args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)
         print("{0} hybridstrobes created from references\n".format(cntr))
     elif args.altstrobe_index:
-        args.k = 10
-        idx, ref_id_to_accession, cntr = build_altstrobe_index(open(args.references, 'r'), 10, 20, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)
+        args.k = int(2*args.k/3)
+        idx, ref_id_to_accession, cntr = build_altstrobe_index(open(args.references, 'r'), args.k, 2*args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)
+        print("{0} altstrobes created from references\n".format(cntr))
+    elif args.multistrobe_index:
+        idx, ref_id_to_accession, cntr = build_multistrobe_index(open(args.references, 'r'), args.n*args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, args.k_boundary)
         print("{0} altstrobes created from references\n".format(cntr))
     elif args.mixedminstrobe_index:
         idx, ref_id_to_accession, cntr = build_mixedstrobemer_index("mixedminstrobes", open(args.references, 'r'), args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)
@@ -718,8 +789,8 @@ def main(args):
         idx, ref_id_to_accession, cntr = build_mixedhybridstrobe_index(open(args.references, 'r'), args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)
         print("{0} mixedhybridstrobes created from references\n".format(cntr))
     elif args.mixedaltstrobe_index:
-        args.k = 10
-        idx, ref_id_to_accession, cntr = build_mixedaltstrobe_index(open(args.references, 'r'), 10, 20, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)
+        args.k = int(2*args.k/3)
+        idx, ref_id_to_accession, cntr = build_mixedaltstrobe_index(open(args.references, 'r'), args.k, 2*args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)
         print("{0} mixedaltstrobes created from references\n".format(cntr))
     else:
         print("No (known) seeding technique was selected.")
@@ -759,8 +830,12 @@ def main(args):
                     read_matches = get_unmerged_matches(strobes, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n)
 
                 elif args.altstrobe_index:
-                    strobes = [(positions, h) for positions, h in indexing.seq_to_altstrobes_iter(seq, 10, 20, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)]
-                    read_matches = get_unmerged_matches_altstrobes(strobes, idx, 10, ref_id_to_accession, acc, args.selfalign, args.n+1)
+                    strobes = [(positions, h) for positions, h in indexing.seq_to_altstrobes_iter(seq, args.k, 2*args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)]
+                    read_matches = get_unmerged_matches_altstrobes(strobes, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n)
+
+                elif args.multistrobe_index:
+                    strobes = [(positions, h) for positions, h in indexing.seq_to_multistrobes_iter(seq, args.n*args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, args.k_boundary)]
+                    read_matches = get_unmerged_matches_multistrobes(strobes, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n, args.k_boundary)
 
                 elif args.mixedminstrobe_index:
                     strobes = [(positions, h) for positions, h in indexing.seq_to_mixedminstrobes_iter(seq, args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)]
@@ -775,8 +850,8 @@ def main(args):
                     read_matches = get_unmerged_matches(strobes, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n)
 
                 elif args.mixedaltstrobe_index:
-                    strobes = [(positions, h) for positions, h in indexing.seq_to_mixedaltstrobes_iter(seq, 10, 20, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)]
-                    read_matches = get_unmerged_matches_altstrobes(strobes, idx, 10, ref_id_to_accession, acc, args.selfalign, args.n+1)
+                    strobes = [(positions, h) for positions, h in indexing.seq_to_mixedaltstrobes_iter(seq, args.k, 2*args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)]
+                    read_matches = get_unmerged_matches_altstrobes(strobes, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n)
 
                 else:
                     raise NameError
@@ -803,8 +878,12 @@ def main(args):
                         read_matches_rc = get_unmerged_matches(strobes_rc, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n)
 
                     elif args.altstrobe_index:
-                        strobes_rc = [(positions, h) for positions, h in indexing.seq_to_altstrobes_iter(reverse_complement(seq), 10, 20, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)]
-                        read_matches_rc = get_unmerged_matches_altstrobes(strobes_rc, idx, 10, ref_id_to_accession, acc, args.selfalign, args.n+1)
+                        strobes_rc = [(positions, h) for positions, h in indexing.seq_to_altstrobes_iter(reverse_complement(seq), args.k, 2*args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)]
+                        read_matches_rc = get_unmerged_matches_altstrobes(strobes_rc, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n)
+
+                    elif args.multistrobe_index:
+                        strobes_rc = [(positions, h) for positions, h in indexing.seq_to_multistrobes_iter(reverse_complement(seq), args.n*args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, args.k_boundary)]
+                        read_matches_rc = get_unmerged_matches_multistrobes(strobes_rc, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n, args.k_boundary)
 
                     elif args.mixedminstrobe_index:
                         strobes_rc = [(positions, h) for positions, h in indexing.seq_to_mixedminstrobes_iter(reverse_complement(seq), args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)]
@@ -819,8 +898,8 @@ def main(args):
                         read_matches_rc = get_unmerged_matches(strobes_rc, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n)
 
                     elif args.mixedaltstrobe_index:
-                        strobes_rc = [(positions, h) for positions, h in indexing.seq_to_mixedaltstrobes_iter(reverse_complement(seq), 10, 20, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)]
-                        read_matches_rc = get_unmerged_matches_altstrobes(strobes_rc, idx, 10, ref_id_to_accession, acc, args.selfalign, args.n+1)
+                        strobes_rc = [(positions, h) for positions, h in indexing.seq_to_mixedaltstrobes_iter(reverse_complement(seq), args.k, 2*args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)]
+                        read_matches_rc = get_unmerged_matches_altstrobes(strobes_rc, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n)
 
                     else:
                         raise NameError
@@ -867,8 +946,8 @@ def main(args):
                     total_bp_covered += opt_cov
                     for n in solution:
                         collinear_chain_nam_sizes.append(n.y - n.x)
-                        sc_positions.append(n.c)
-                        sc_positions.append(n.c + n.val - args.k)
+                        sc_positions.append([n.c, n.len1])
+                        sc_positions.append([n.c + n.val - n.len2, n.len2])
                         m += 1
 
                         if n.c > gap_pos:
@@ -881,10 +960,8 @@ def main(args):
                 # collinear_outfile.close()
 
                 #m = len(read_matches) + len(read_matches_rc)
-                if args.altstrobe_index or args.mixedaltstrobe_index:
-                    m = m/2 # correct for representation as two hits
                 # sc = get_sequence_coverage(sorted(sc_positions), args.k)
-                sc = get_sequence_coverage(sorted(sc_positions), args.k)
+                sc = get_sequence_coverage(sorted(sc_positions))
                 if args.rev_comp:
                     seeds = len(strobes) + len(strobes_rc)
                 else:
@@ -960,10 +1037,12 @@ if __name__ == '__main__':
     parser.add_argument('--randstrobe_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for randstrobes')
     parser.add_argument('--hybridstrobe_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for hybridstrobes')
     parser.add_argument('--altstrobe_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for altstrobes')
+    parser.add_argument('--multistrobe_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for multistrobes')
     parser.add_argument('--mixedminstrobe_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for mixed minstrobes/kmers based on --strobe_fraction')
     parser.add_argument('--mixedrandstrobe_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for mixed randstrobes/kmers based on --strobe_fraction')
     parser.add_argument('--mixedhybridstrobe_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for mixed hybridstrobes/kmers based on --strobe_fraction')
     parser.add_argument('--mixedaltstrobe_index', action="store_true",  help='Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for mixed altstrobes/kmers based on --strobe_fraction')
+    parser.add_argument('--k_boundary', type=int, default=5, help='minimum strobe length (k >= 4 recommended to ensure uniqueness)')
     parser.add_argument('--segment', type=int, default=2000, help='segment length for computing the collinear chain solution of the raw hits')
     parser.add_argument('--selfalign', action="store_true",  help='Aligns sequences to itself (mainly used for bugfixing). Default is not align\
                                                                     sequences to themselves if the same file is given as references and queries.')

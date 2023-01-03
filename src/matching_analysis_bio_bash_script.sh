@@ -53,4 +53,6 @@ python3 matching_analysis_bio.py --references ../data/GCF_003018135.1_ASM301813v
 python3 matching_analysis_bio.py --references ../data/GCF_003018135.1_ASM301813v1_genomic.fna --queries ../data/SRR13893500_1000_longest.fasta --n 2 --k 10 --strobe_w_min_offset 25 --strobe_w_max_offset 50 --strobe_fraction 0.8 --rev_comp --mixedaltstrobe_index --outfolder ../output/ --prefix mixedaltstrobe80
 python3 matching_analysis_bio.py --references ../data/GCF_003018135.1_ASM301813v1_genomic.fna --queries ../data/SRR13893500_1000_longest.fasta --n 2 --k 10 --strobe_w_min_offset 25 --strobe_w_max_offset 50 --strobe_fraction 0.9 --rev_comp --mixedaltstrobe_index --outfolder ../output/ --prefix mixedaltstrobe90
 
+# multistrobes
+python3 matching_analysis_bio.py --references ../data/GCF_003018135.1_ASM301813v1_genomic.fna --queries ../data/SRR13893500_1000_longest.fasta --n 2 --k 15 --k_boundary 5 --strobe_w_min_offset 25 --strobe_w_max_offset 50 --rev_comp --multistrobe_index --outfolder ../output/ --prefix multistrobe
 
