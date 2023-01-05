@@ -1,16 +1,20 @@
-Mixedstrobes/Altstrobes
+Mixedstrobes/Altstrobes/Multistrobes
 ===========
 
-This repository contains information, scripts, and sourcecode to run the analysis for various strobemers in Maier and Sahlin, 2022 [bioRxiv LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198v1). For info about strobemers, see [the repo](https://github.com/ksahlin/strobemers).
+This repository contains information, scripts, and sourcecode to run the analysis for various strobemers in Maier and Sahlin, 2023 [bioRxiv LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198). For info about strobemers, see [the repo](https://github.com/ksahlin/strobemers).
 
 
 ### What is a mixedstrobe?
 
-Mixedstrobes is a mixed seeding technique that samples either a $k$-mer or a strobemer at a specified fraction. They may be sampled with all three strobemers seeding techniques (minstrobes, hybridstrobes and randstrobes) as well as altstrobes. Analogous to strobemers, we parameterize mixedstrobes as $(n,\ell,w_{min}, w_{max}, q)$, where $n$ is the number of strobes $n$, $\ell$ is the strobe length, $w_{min}$ and $w_{max}$ the minimum and maximum downstream offset to last window, and $q$ the strobemer fraction. Details on construction are found in [bioRxiv LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198v1)
+Mixedstrobes is a mixed seeding technique that samples either a $k$-mer or a strobemer at a specified fraction. They may be sampled with all three strobemers seeding techniques (minstrobes, hybridstrobes and randstrobes) as well as altstrobes. Analogous to strobemers, we parameterize mixedstrobes as $(n,\ell,w_{min}, w_{max}, q)$, where $n$ is the number of strobes $n$, $\ell$ is the strobe length, $w_{min}$ and $w_{max}$ the minimum and maximum downstream offset to last window, and $q$ the strobemer fraction. Details on construction are found in [bioRxiv LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198)
 
 ### What is an altstrobe?
 
-Altstrobes are modified randstrobes where the strobe length is alternating between shorter and longer strobes. Contrary to randstrobes, where all strobes are of equal size (e.g. $k/2$ for strobemers of order 2), altstrobes are build up of one short strobe $k_s$ one longer strobe $k_l$, with $|k_s| + |k_l| = k$. We parameterize altstrobes as $(n,|k_s|/|k_l|, w_{min}, w_{max})$. Details on constructions are found in [bioRxiv LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198v1)
+Altstrobes are modified randstrobes where the strobe length is alternating between shorter and longer strobes. Contrary to randstrobes, where all strobes are of equal size (e.g. $k/2$ for strobemers of order 2), altstrobes are build up of one short strobe $k_s$ one longer strobe $k_l$, with $|k_s| + |k_l| = k$. We parameterize altstrobes as $(n,|k_s|,|k_l|, w_{min}, w_{max})$. Details on constructions are found in [bioRxiv LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198)
+
+### What is a multistrobe?
+
+Multistrobes are generalized altstrobes where seeds with multiple different strobe lengths are generated within the same seeding pass. Contrary to altstrobes, where all strobes are of size $|k_s|,|k_l|$, multistrobes are selected in a range of lengths ranging from $|k_s|$ to $|k_l|=k-|k_s|$. We parameterize multistrobes analogously to altstrobes as $(n,|k_s|,|k_l|, w_{min}, w_{max})$. Details on constructions are found in [bioRxiv LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198)
 
 ### This repository
 
@@ -20,18 +24,18 @@ The repository consists of
 - functions to generate strobemers in Python
 - a tool `StrobeMap` implemented in both C++ and Python
 - a modified version of 'minimap2' for strobemers
-- scripts used for the evaluations in the [paper LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198v1)
+- scripts used for the evaluations in the [paper LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198)
 
 # C++ functions
 
-The C++ library `strobemers_cpp/index.[cpp/hpp]` contains functions for creating altstrobes, mixedstrobes, randstobes, hybridstrobes and minstrobes. 
+The C++ library `strobemers_cpp/index.[cpp/hpp]` contains functions for creating altstrobes, multistrobes, mixedstrobes, randstobes, hybridstrobes, and minstrobes. 
 
-You can copy the `index.cpp` and `index.hpp` files in the `strobemers_cpp` folder in this repository if you want to use either altstrobes, mixedstrobes, randstobes, hybridstrobes, or minstrobes in your project. They have the same user interface as described [here](https://github.com/ksahlin/strobemers#c-functions).
+You can copy the `index.cpp` and `index.hpp` files in the `strobemers_cpp` folder in this repository if you want to use either altstrobes, multistrobes, mixedstrobes, randstobes, hybridstrobes, or minstrobes in your project. They have the same user interface as described [here](https://github.com/ksahlin/strobemers#c-functions).
 
 
 # Python functions
 
-The `indexing_Maier_altstrobes.py` module located in the `modules` folder contains functions for generating k-mers, spaced k-mers, minimizers, and strobemers (minstrobes, hybridstrobes, randstrobes, mixedstrobes, and altstrobes) of any order. They have the same user interface as described [here](https://github.com/ksahlin/strobemers#python-functions).  
+The `indexing_Maier_altstrobes.py` module located in the `modules` folder contains functions for generating k-mers, spaced k-mers, minimizers, and strobemers (minstrobes, hybridstrobes, randstrobes, mixedstrobes, altstrobes, and multistrobes) of any order. They have the same user interface as described [here](https://github.com/ksahlin/strobemers#python-functions).  
 
 # StrobeMap (C++)
 
@@ -40,7 +44,7 @@ The tool `StrobeMap_Maier` is a program which roughly has the same interface as 
 
 ## Installation
 
-`StrobeMap` (currently still without altstrobes and mixedstrobes) is available through [bioconda](https://bioconda.github.io/recipes/strobemap/README.html#package-strobemap). You can also acquire precompiled binaries for Linux from [here](https://github.com/benjamindominikmaier/mixedstrobes_altstrobes/tree/main/src/cpp/binaries). For example, for linux, simply do
+`StrobeMap` (currently still without altstrobes, mixedstrobes and multistrobes) is available through [bioconda](https://bioconda.github.io/recipes/strobemap/README.html#package-strobemap). You can also acquire precompiled binaries for Linux from [here](https://github.com/benjamindominikmaier/mixedstrobes_altstrobes/tree/main/src/cpp/binaries). For example, for linux, simply do
 
 ```
 wget ./mixedstrobes_altstrobes/src/cpp/binaries/StrobeMap
@@ -84,7 +88,7 @@ options:
 	-f INT strobe_fraction [60]
 	-t INT number of threads [3]
 	-o name of output tsv-file [output.tsv]
-	-c Choice of protocol to use; kmers, minstrobes, hybridstrobes, altstrobes, randstrobes [randstrobes]. 
+	-c Choice of protocol to use; kmers, minstrobes, hybridstrobes, altstrobes, randstrobes, multistrobes [randstrobes]. 
 	-C UINT Mask (do not process) strobemer hits with count larger than C [1000]
 	-L UINT Print at most L NAMs per query [1000]. Will print the NAMs with highest score S = n_strobemer_hits * query_span. 
 	-S Sort output NAMs for each query based on score. Default is to sort first by ref ID, then by query coordinate, then by reference coordinate. 
@@ -112,7 +116,7 @@ ref_id  ref_pos query_pos   match_length_on_reference
 
 # Minimap2-Strobemers
 
-We implemented subsampled randstrobes, mixedstrobes, and altstrobe seeds in minimap2. A precompiled binary for Linux can be directly downloaded from [here](https://github.com/benjamindominikmaier/mixedstrobes_altstrobes/tree/main/src/minimap-strobemer/minimap2).
+We implemented subsampled randstrobes, mixedstrobes, altstrobe, an multistrobe seeds in minimap2. A precompiled binary for Linux can be directly downloaded from [here](https://github.com/benjamindominikmaier/mixedstrobes_altstrobes/tree/main/src/minimap-strobemer/minimap2).
 
 If you want to compile from the source, you need to have a C compiler, GNU make and zlib development files installed. Then type make in the source code directory to compile. If you see compilation errors, try make sse2only=1 to disable SSE4 code, which will make minimap2-strobemer slightly slower.
 
@@ -121,8 +125,10 @@ All default minimap2 settings can be found in the original minimap implementatio
  --mixedstrobes  sample mixedrandstrobes80 instead of k-mers
  --altstrobes    sample altstrobes (k,2k) instead of k-mers
  --randstrobes   sample randstrobes (k,k) instead of k-mers
+ -- multistrobes sample multistrobes (k_s, 2k-k_s) instead of k-mers
     -i INT       minimal strobe offset [25].
     -j INT       maximial strobe offset [50].
+    -b INT       minimal k-mer size (multistrobes) [5].
 ```
 
 # Evaluation Scripts
@@ -133,16 +139,24 @@ Are found in the `src` folder. Run instructions provided below
 
 The script is used to compute the matching metrics (fraction of matches, the sequence coverage, the match coverage and the expected island size as definied in Sahlin 2021) of simulated sequences with various mutation rates and all strobemer methods.
 
-When running the script without specifying any parameters (as in Maier & Sahlin, 2022), 1000 random DNA sequences (`--nr_exp`) of length 10,000nt (`--nr_exp`) are generated and subsequently mutated with mutation frequencies of 0.01, 0.05 and 0.1 ($--mut_freqs$) and equal chance for insertions, deletions and substitutions (see `--experiment_type`) to obtain corresponding query sequences. In the default mode, the sequences are seeded with all available methods (`kmers", "spaced_kmers_dense", "spaced_kmers_sparse", "minstrobes", "randstrobes", "hybridstrobes", "altstrobes", "mixedminstrobes", "mixedrandstrobes", "mixedhybridstrobes", "mixedaltstrobes`) and strobemer settings (2,15,25,50) (see `--k_size, --w, --orders, --w_low, --w_high`). By default, mixedstrobes are analyzed with strobe fractions ranging from 0.1 to 0.9, which can be changed using `--strobe_fractions`.
+When running the script without specifying any parameters (as in Maier & Sahlin, 2023), 1000 random DNA sequences (`--nr_exp`) of length 10,000nt (`--nr_exp`) are generated and subsequently mutated with mutation frequencies of 0.01, 0.05 and 0.1 ($--mut_freqs$) and equal chance for insertions, deletions and substitutions (see `--experiment_type`) to obtain corresponding query sequences. In the default mode, the sequences are seeded with all available methods (`kmers", "spaced_kmers_dense", "spaced_kmers_sparse", "minstrobes", "randstrobes", "hybridstrobes", "altstrobes", "mixedminstrobes", "mixedrandstrobes", "mixedhybridstrobes", "mixedaltstrobes`) and strobemer settings (2,15,25,50) (see `--k_size, --w, --orders, --w_low, --w_high`). By default, mixedstrobes are analyzed with strobe fractions ranging from 0.1 to 0.9, which can be changed using `--strobe_fractions`.
 
 However, it is also possible to specify only one seeding technique using the `--method` parameter or sample generalized_altstrobes using `--altstrobes_generalized`. When sampling generalized altstrobes, the matching analysis is performed for altstrobes of all combinations from (1,k-1) to (k/2,k/2), whereby a lower boundary can be specified using `--k_boundary`, which is recommended as altstrobes with `k_s < 5` cause uniqueness issues and thus bad performance. Additionally, we implemented the possibility to sample e.g. strobemer-strobemer combinations using the `--mixedstrobes` parameter, which allows to sample a mix of any two techniques with distributions given by `--strobe_fractions`.
 
 ### Usage 
 
 ```
-usage: matching_analysis_simulated.py [-h] [--L L] [--nr_exp NR_EXP] [--experiment_type EXPERIMENT_TYPE] [--mut_freqs MUT_FREQS] [--k_size K_SIZE] [--w W] [--orders ORDERS] [--w_low W_LOW]
-                                      [--w_high W_HIGH] [--strobe_fractions STROBE_FRACTIONS] [--all_methods] [--method METHOD] [--altstrobes_generalized] [--k_boundary K_BOUNDARY] [--mixedstrobes]
-                                      [--mixedstrobes_methods MIXEDSTROBES_METHODS]
+usage: matching_analysis_simulated.py [-h] [--L L] [--nr_exp NR_EXP]
+                                      [--experiment_type EXPERIMENT_TYPE] [--subs_freq SUBS_FREQ]
+                                      [--mut_freqs MUT_FREQS [MUT_FREQS ...]] [--k_size K_SIZE]
+                                      [--w W] [--orders ORDERS [ORDERS ...]] [--w_low W_LOW]
+                                      [--w_high W_HIGH]
+                                      [--strobe_fractions STROBE_FRACTIONS [STROBE_FRACTIONS ...]]
+                                      [--all_methods] [--method METHOD] [--altstrobes_generalized]
+                                      [--altstrobes_size_distribution] [--multistrobes]
+                                      [--multistrobes_size_distribution] [--k_boundary K_BOUNDARY]
+                                      [--mixedstrobes]
+                                      [--mixedstrobes_methods MIXEDSTROBES_METHODS] [--verbose]
 
 Calc identity
 
@@ -151,25 +165,35 @@ optional arguments:
   --L L                 Length of simulated sequences (default: 10000)
   --nr_exp NR_EXP       Number of simulated experiments (default: 1000)
   --experiment_type EXPERIMENT_TYPE
-                        experiment type choose between "all", "controlled or "only_subs" (default: all)
-  --mut_freqs MUT_FREQS
+                        experiment type choose between "all", "controlled", "specified" or "only_subs" (default: all)
+  --subs_freq SUBS_FREQ
+                        substitution frequency among all mutations for --experiment_type "specified"; rest split evenly in insertions and deletions (default: 0.33)
+  --mut_freqs MUT_FREQS [MUT_FREQS ...]
                         mutation frequencies [0,1] (default: [0.01, 0.05, 0.1])
   --k_size K_SIZE       k-mer/strobemer length (default: 30)
-  --w W                 number of hashes used in a sliding window for thinning (w=1 means no thinning) (default: 20)
-  --orders ORDERS       List with orders of strobes to be analzyed (default: [2])
+  --w W                 number of hashes used in a sliding window for thinning (w=1 means no thinning) (default: 1)
+  --orders ORDERS [ORDERS ...]
+                        List with orders of strobes to be analzyed (default: [2])
   --w_low W_LOW         minimum window offset to the previous window (wMin > 0) (default: 25)
   --w_high W_HIGH       maximum window offset to the previous window (wMin <= wMax) (default: 50)
-  --strobe_fractions STROBE_FRACTIONS
+  --strobe_fractions STROBE_FRACTIONS [STROBE_FRACTIONS ...]
                         Fraction of sampled strobemers, rest kmers (default: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
   --all_methods         perform matching analysis on simulated data for all (mixed-)strobemer and (mixed-)altstrobe seeding techniques (default: False)
   --method METHOD       choose seeding technique (default: none)
   --altstrobes_generalized
                         perform matching analysis on simulated data for altstrobes of all combinations from (1,k-1) to (k/2,k/2) (default: False)
+  --altstrobes_size_distribution
+                        perform matching analysis on simulated data for altstrobes with strobe size distribution (k_s, k_l) determined by strobe_fraction (default: False)
+  --multistrobes        perform matching analysis on simulated data for multistrobes of all combinations from (k_boundary,k-k_boundary) to (k/2,k/2) (default: False)
+  --multistrobes_size_distribution
+                        perform matching analysis on simulated data for multistrobes of all combinations from (k_boundary,k-k_boundary) to (k/2,k/2) with strobe size distribution (k_s, k_l) determined
+                        by strobe_fraction (default: False)
   --k_boundary K_BOUNDARY
                         minimum strobe length (k >= 4 recommended to ensure uniqueness) (default: 5)
   --mixedstrobes        perform matching analysis on simulated data for user defined mixed seeding techniques (default: False)
   --mixedstrobes_methods MIXEDSTROBES_METHODS
                         List with two seeding methods to sample mixedstrobes (default: ['randstrobes', 'kmers'])
+  --verbose
 ```
 
 ### Output
@@ -182,12 +206,12 @@ minstrobes  &  (2, 15, 25, 50)  &  67.0 & 75.7 & 96.2 & 2.1  &  0.01
 
 ## matching_analysis_bio
 
-The script is used to compute the matching metrics (as definied in Sahlin 2021) of biological sequences for all strobemer methods. The query sequences (`--queries`) are split up in 
-disjoint segments of length (`--segment`) and mapped to the reference (`--references`) before the collinear chain solution of raw unmerged hits is determined for each segment and the matching metrics computed from it. The collinear chain solution takes only the longest collinear chain of hits into account, thus assuming the most likely location and avoiding to overcount "spurious" hits (see Sahlin, 2021). Details on implementation are found in [bioRxiv LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198v1) Supplementary Section S4.
+The script is used to compute the matching metrics (as definied in Sahlin 2021 [LINK](https://www.genome.org/cgi/doi/10.1101/gr.275648.121)) of biological sequences for all strobemer methods. The query sequences (`--queries`) are split up in 
+disjoint segments of length (`--segment`) and mapped to the reference (`--references`) before the collinear chain solution of raw unmerged hits is determined for each segment and the matching metrics computed from it. The collinear chain solution takes only the longest collinear chain of hits into account, thus assuming the most likely location and avoiding to overcount "spurious" hits (see Sahlin, 2021 [LINK](https://www.genome.org/cgi/doi/10.1101/gr.275648.121)). Details on implementation are found in [bioRxiv LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198) Supplementary Section S4.
 
 ### Usage
 ```
-usage: matching_analysis_bio.py [-h] [--queries QUERIES] [--references REFERENCES] [--k K] [--strobe_w_min_offset STROBE_W_MIN_OFFSET] [--strobe_w_max_offset STROBE_W_MAX_OFFSET] [--w W] [--n N] [--strobe_fraction STROBE_FRACTION] [--dont_merge_matches] [--outfolder OUTFOLDER] [--prefix PREFIX] [--kmer_index] [--minstrobe_index] [--randstrobe_index] [--hybridstrobe_index] [--altstrobe_index] [--mixedminstrobe_index] [--mixedrandstrobe_index] [--mixedhybridstrobe_index] [--mixedaltstrobe_index] [--segment SEGMENT] [--selfalign] [--rev_comp]
+usage: matching_analysis_bio.py [-h] [--queries QUERIES] [--references REFERENCES] [--k K] [--strobe_w_min_offset STROBE_W_MIN_OFFSET] [--strobe_w_max_offset STROBE_W_MAX_OFFSET] [--w W] [--n N] [--strobe_fraction STROBE_FRACTION] [--dont_merge_matches] [--outfolder OUTFOLDER] [--prefix PREFIX] [--kmer_index] [--minstrobe_index] [--randstrobe_index] [--hybridstrobe_index] [--altstrobe_index] [--multistrobe_index] [--mixedminstrobe_index] [--mixedrandstrobe_index] [--mixedhybridstrobe_index] [--mixedaltstrobe_index] [--segment SEGMENT] [--selfalign] [--rev_comp]
 
 Calc identity
 
@@ -214,6 +238,7 @@ optional arguments:
   --randstrobe_index    Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for randstrobes (default: False)
   --hybridstrobe_index  Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for hybridstrobes (default: False)
   --altstrobe_index     Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for altstrobes (default: False)
+  --multistrobe_index   Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for multistrobes (default: False)
   --mixedminstrobe_index
                         Produce chains of matches that are in identical order in both sequences (collinear chaining algorithm) and compute matching metrics for mixed minstrobes/kmers based on
                         --strobe_fraction (default: False)
@@ -254,14 +279,14 @@ Query Number & Query Length & Fraction of Matches & Sequence Coverage & Match Co
 
 ## uniqueness_analysis
 
-This script computes the uniqueness of seeds and the expected number of hits (E-size) for either a given reference sequence or a simulated sequence. E-size is a measure of how repetitive the seeds in a query sequence are, on average, in a reference dataset; details on calculation are given in Sahlin, 2022.
+This script computes the uniqueness of seeds and the expected number of hits (E-size) for either a given reference sequence or a simulated sequence. E-size is a measure of how repetitive the seeds in a query sequence are, on average, in a reference dataset; details on calculation are given in Sahlin, 2022 [LINK](https://doi-org.ezp.lib.cam.ac.uk/10.1186/s13059-022-02831-7).
 
 ### Usage
 
 ```
 usage: uniqueness_analysis.py [-h] [--fasta FASTA] [--kmers] [--minstrobes] [--mixedminstrobes] [--randstrobes] [--mixedrandstrobes] [--hybridstrobes] [--mixedhybridstrobes] [--spaced_dense]
-                              [--spaced_sparse] [--altstrobes] [--mixedaltstrobes] [--order ORDER] [--strobe_fraction STROBE_FRACTION] [--k_sizes K_SIZES [K_SIZES ...]] [--w W] [--w_low W_LOW]
-                              [--w_high W_HIGH] [--altstrobes_generalized ALTSTROBES_GENERALIZED] [--L L] [--nr_exp NR_EXP]
+                              [--spaced_sparse] [--altstrobes] [--multistrobes] [--mixedaltstrobes] [--order ORDER] [--strobe_fraction STROBE_FRACTION] [--k_sizes K_SIZES [K_SIZES ...]]
+                              [--k_boundary K_BOUNDARY] [--w W] [--w_low W_LOW] [--w_high W_HIGH] [--altstrobes_generalized ALTSTROBES_GENERALIZED] [--L L] [--nr_exp NR_EXP]
 
 Calc identity
 
@@ -277,20 +302,24 @@ optional arguments:
   --mixedhybridstrobes  Seeding mixedhybridstrobes (hybridstrobes/k-mers) with a user-defined --strobe_fraction (default: False)
   --spaced_dense        Seeding spaced k-mers (dense) (default: False)
   --spaced_sparse       Seeding spaced k-mers (sparse) (default: False)
-  --altstrobes          Kmer size (default: False)
-  --mixedaltstrobes     Kmer size (default: False)
+  --altstrobes          Seeding altstrobes (default: False)
+  --multistrobes        Seeding multistrobes of all combinations from (k_boundary,k-k_boundary) to (k/2,k/2) (default: False)
+  --mixedaltstrobes     Seeding mixedaltstrobes (altstrobes/k-mers) with a user-defined --strobe_fraction (default: False)
   --order ORDER         Order on strobes (default: 2)
   --strobe_fraction STROBE_FRACTION
                         Fraction of sampled strobemers, rest kmers (default: 1)
   --k_sizes K_SIZES [K_SIZES ...], --nargs-int-type K_SIZES [K_SIZES ...]
                         List with strobe lengths to be analyzed (default: [18, 24, 30, 36])
+  --k_boundary K_BOUNDARY
+                        minimum strobe length (k >= 4 recommended to ensure uniqueness) (default: 5)
   --w W                 number of hashes used in a sliding window for thinning (w=1 means no thinning) (default: 1)
   --w_low W_LOW         minimum window offset to the previous window (wMin > 0) (default: 25)
   --w_high W_HIGH       maximum window offset to the previous window (wMin <= wMax) (default: 50)
   --altstrobes_generalized ALTSTROBES_GENERALIZED
                         Choose k-size to seed altstrobes with strobe combinations from (1,k-1) to (k-1,1) (default: 0)
-  --L L                 Length of simulated sequences (only if no fasta file is provided) (default: 10000)
+  --L L                 Length of simulated sequences (only if no fasta file is provided) (default: 100000)
   --nr_exp NR_EXP       Number of simulated experiments (only if no fasta file is provided) (default: 1)
+
 ```
 
 ### Output
@@ -373,14 +402,14 @@ python3 analyze_minimap.py --input_file ../output/minimap/cmh13_kmers15_00.sam -
 238 249 100000
 ```
 
-## Stochasticity in Seed Construct (entropy_vs_p_one_seed-2022-09-07.py)
+## Stochasticity in Seed Construct
 
 This script performs simulations showing how stochasticity in seed construct influence probability of `w` consecutive seeds producing at least one match in a region of length `2w = 128` between sequences for various seed constructs.
 
-### Usage
+### Usage (fig2A_analysis.py)
 
 ```
-usage: entropy_vs_p_one_seed-2022-09-07.py [-h] [--N_SIM N_SIM] k w_min w_max outcsv outplot_prefix
+usage: fig2A_analysis.py [-h] [--N_SIM N_SIM] [--thinning THINNING] k w_min w_max outcsv outplot_prefix
 
 Calc identity
 
@@ -394,17 +423,43 @@ positional arguments:
 optional arguments:
   -h, --help      show this help message and exit
   --N_SIM N_SIM   Number of simulations for p_matches experiment (default: 1000)
+  --thinning      Thinning level, 1/X. (default X=1 no thinning)
 ```
 
 ### Output
 
-This script produces csv.files with the following columns: `w_min,w_max,type,x,m,y,mean_error_y_est,analysis,ymetric` as well as corresponding plots. The y-metric is either `p_match, E_overlap_theory, E_overlap_real_hash, Entropy`.
+This script produces csv.files with the following columns: `w_min,w_max,seeding,N_m,stddev_est,m` as well as corresponding plots.
 
-## Figures in Maier & Sahlin, 2022
+### Usage (fig2B-C_conditional_entropy_on_c.py)
 
-All figures in Maier & Sahlin, 2022 can be generated running the R-notebook `figures.rmd`. All data tables as well as all figures used in this manuscript can be found in the output folder in this repository.
+```
+usage: fig2B-C_conditional_entropy_on_c.py [-h] [--max_mut_freq MAX_MUT_FREQ] [--N_SIM N_SIM] k w_min w_max outcsv outplot_prefix
+
+
+Calc identity
+
+positional arguments:
+  k               k-mer size
+  w_min           Window size
+  w_max           Window size
+  outcsv          output CSV file for plotting.
+  outplot_prefix  output pdf file prefix.
+
+optional arguments:
+  -h, --help      show this help message and exit
+  --N_SIM N_SIM   Number of simulations for p_matches experiment (default: 1000)
+  --max_mut_freq  Maximum mutation frequency for simulations
+```
+
+### Output
+
+This script produces csv.files with the following columns: `w_min,w_max,type,x,m,y,mean_error_y_est,analysis,ymetric` as well as corresponding plots. The y-metric is either `p_match` or `Entropy`.
+
+## Figures in Maier & Sahlin, 2023
+
+All figures in Maier & Sahlin, 2023 can be generated running the R-notebook `figures.rmd`. All data tables as well as all figures used in this manuscript can be found in the output folder in this repository.
 
 CREDITS
 ----------------
 
-Benjamin D. Maier and Kristoffer Sahlin, Entropy predicts fuzzy-seed sensititivity, bioRxiv, October 2022; https://www.biorxiv.org/content/10.1101/2022.10.13.512198v1
+Benjamin D. Maier and Kristoffer Sahlin, Entropy predicts sensitivity of pseudo-random seeds, bioRxiv, January 2023; https://www.biorxiv.org/content/10.1101/2022.10.13.512198
