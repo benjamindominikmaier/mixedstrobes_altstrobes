@@ -79,7 +79,7 @@ def compute_frac_matches_per_mut_rate(args, N_sim, outfile):
         seq_pairs[m] = []
         for n in range(N_sim):
             seq1 = "".join([random.choice("ACGT") for i in range(L)])
-            muts = set(random.sample(range(2*w),m)) # only sample mutations within the 2W region to control mutation rate in the region according to theory 
+            muts = set(random.sample(range(2*w),m)) # only sample mutations within the 2W region to control mutation rate in the region according to theory
             subs = random.uniform(0, 1)
             seq2 = "".join([seq1[i] if i not in muts else random.choices([reverse_complement(seq1[i]), '',  seq1[i] + random.choice("ACGT")],  weights = [subs, subs/2,subs/2] )[0] for i in range(len(seq1))])
             seq_pairs[m].append((seq1,seq2))
@@ -99,10 +99,10 @@ def compute_frac_matches_per_mut_rate(args, N_sim, outfile):
             seq1 ,seq2 = seq_pairs[m][n]
             kmers_pos1 = indexing.kmers(seq1, k, 1)
             kmers_pos2 = indexing.kmers(seq2, k, 1)
-            
-            # check the seeds within the window 
-            seeds1 = [s for i, s in kmers_pos1.items() if i <= w and i % args.thinning == 0]  
-            seeds2 = [s for i, s in kmers_pos2.items() if i <= w and i % args.thinning == 0]  
+
+            # check the seeds within the window
+            seeds1 = [s for i, s in kmers_pos1.items() if i <= w and i % args.thinning == 0]
+            seeds2 = [s for i, s in kmers_pos2.items() if i <= w and i % args.thinning == 0]
             matches = set(seeds1) & set(seeds2)
             n_hits = len(matches)
             if n_hits > 0:
@@ -132,8 +132,8 @@ def compute_frac_matches_per_mut_rate(args, N_sim, outfile):
             minstrobes_pos1 = indexing.minstrobes(seq1, k, w_min, w_max, 1)
             # print(minstrobes_pos1)
             minstrobes_pos2 = indexing.minstrobes(seq2, k, w_min, w_max, 1)
-            
-            # check the seeds within the window 
+
+            # check the seeds within the window
             seeds1 = [s for i_tuple, s in minstrobes_pos1.items() if i_tuple[0] <= w and i_tuple[0] % args.thinning == 0]
             seeds2 = [s for i_tuple, s in minstrobes_pos2.items() if i_tuple[0] <= w and i_tuple[0] % args.thinning == 0]
             # print(len(seeds1))
@@ -166,8 +166,8 @@ def compute_frac_matches_per_mut_rate(args, N_sim, outfile):
             hybridstrobes_pos1 = indexing.hybridstrobes(seq1, k, w_min, w_max, 1)
             # print(hybridstrobes_pos1)
             hybridstrobes_pos2 = indexing.hybridstrobes(seq2, k, w_min, w_max, 1)
-            
-            # check the seeds within the window 
+
+            # check the seeds within the window
             seeds1 = [s for i_tuple, s in hybridstrobes_pos1.items() if i_tuple[0] <= w and i_tuple[0] % args.thinning == 0]
             seeds2 = [s for i_tuple, s in hybridstrobes_pos2.items() if i_tuple[0] <= w and i_tuple[0] % args.thinning == 0]
             # print(len(seeds1))
@@ -205,8 +205,8 @@ def compute_frac_matches_per_mut_rate(args, N_sim, outfile):
             altstrobes_pos1 = indexing.altstrobes_generalized(seq1, k_s, k_l, w_min, w_max, 1)
             # print(altstrobes_pos1)
             altstrobes_pos2 = indexing.altstrobes_generalized(seq2, k_s, k_l, w_min, w_max, 1)
-            
-            # check the seeds within the window 
+
+            # check the seeds within the window
             seeds1 = [s for i_tuple, s in altstrobes_pos1.items() if i_tuple[0] <= w and i_tuple[0] % args.thinning == 0]
             seeds2 = [s for i_tuple, s in altstrobes_pos2.items() if i_tuple[0] <= w and i_tuple[0] % args.thinning == 0]
             # print(len(seeds1))
@@ -242,10 +242,10 @@ def compute_frac_matches_per_mut_rate(args, N_sim, outfile):
             altstrobes_pos1 = indexing.altstrobes_generalized(seq1, k_s, k_l, w_min, w_max, 1)
             # print(altstrobes_pos1)
             altstrobes_pos2 = indexing.altstrobes_generalized(seq2, k_s, k_l, w_min, w_max, 1)
-            
-            # check first W seeds 
+
+            # check first W seeds
             seeds1 = [s for i_tuple, s in altstrobes_pos1.items() if i_tuple[0] <= w and i_tuple[0] % args.thinning == 0]
-            seeds2 = [s for i_tuple, s in altstrobes_pos2.items() if i_tuple[0] <= w and i_tuple[0] % args.thinning == 0] 
+            seeds2 = [s for i_tuple, s in altstrobes_pos2.items() if i_tuple[0] <= w and i_tuple[0] % args.thinning == 0]
             matches = set(seeds1) & set(seeds2)
             n_hits = len(matches)
 
@@ -281,8 +281,8 @@ def compute_frac_matches_per_mut_rate(args, N_sim, outfile):
             mixedstrobes_pos1 = indexing.mixedrandstrobes(seq1, k, w_min, w_max, 1, strobe_fraction=p_strobe)
             # print(mixedstrobes_pos1)
             mixedstrobes_pos2 = indexing.mixedrandstrobes(seq2, k, w_min, w_max, 1, strobe_fraction=p_strobe)
-            
-            # check first W seeds 
+
+            # check first W seeds
             seeds1 = [s for i_tuple, s in mixedstrobes_pos1.items() if i_tuple[0] <= w and i_tuple[0] % args.thinning == 0]
             seeds2 = [s for i_tuple, s in mixedstrobes_pos2.items() if i_tuple[0] <= w and i_tuple[0] % args.thinning == 0]
             matches = set(seeds1) & set(seeds2)
@@ -319,8 +319,8 @@ def compute_frac_matches_per_mut_rate(args, N_sim, outfile):
             # print([i_tuple for i_tuple, s in altstrobes_pos1.items() if i_tuple[0][0] <= w] )
             # print([i_tuple[0][0] for i_tuple, s in altstrobes_pos1.items() if i_tuple[0][0] <= w] )
             altstrobes_pos2 = indexing.altstrobes_continous(seq2, k, w_min, w_max, 1, k_boundary=k_s)
-            
-            # check first W seeds 
+
+            # check first W seeds
             seeds1 = [s for i_tuple, s in altstrobes_pos1.items() if i_tuple[0][0] <= w and i_tuple[0][0] % args.thinning == 0 ]
             seeds2 = [s for i_tuple, s in altstrobes_pos2.items() if i_tuple[0][0] <= w and i_tuple[0][0] % args.thinning == 0 ]
             matches = set(seeds1) & set(seeds2)
@@ -342,7 +342,7 @@ def compute_frac_matches_per_mut_rate(args, N_sim, outfile):
     print('Altstrobes sum frac:', sum(cumulative_frac))
     print()
 
-    return 
+    return
 
 def plot_p_match(args, input_csv, plot_file_prefix , x="k_2/k"):
 
@@ -365,10 +365,10 @@ def plot_p_match(args, input_csv, plot_file_prefix , x="k_2/k"):
     indata = pd.read_csv(input_csv)
     # sns.set_palette("pastel", 8, .75)
     print(sns.color_palette())
-    sns.set_palette("Set1") 
-    g = sns.relplot(data=indata, x="m", y="N_m", hue="seeding", kind='line', facet_kws=dict(sharex=False), 
+    sns.set_palette("Set1")
+    g = sns.relplot(data=indata, x="m", y="N_m", hue="seeding", kind='line', facet_kws=dict(sharex=False),
                     hue_order = methods,
-                    palette=palette) #s=80, 
+                    palette=palette) #s=80,
     # g.set(yscale="log")
     # g.set(ylim=(0.0001, 1.2))
     plt.xticks([1, 5, 10,15, 20])
@@ -378,7 +378,7 @@ def plot_p_match(args, input_csv, plot_file_prefix , x="k_2/k"):
 
 def main(args):
     outfile = open(args.outcsv, 'w')
-    outfile.write("w_min,w_max,seeding,N_m,stddev_est,m\n") # N is nr matches, N_mut is nr muations 
+    outfile.write("w_min,w_max,seeding,N_m,stddev_est,m\n") # N is nr matches, N_mut is nr muations
     print('Using N_SIM:', args.N_SIM)
     compute_frac_matches_per_mut_rate(args, args.N_SIM, outfile)
     outfile.close()

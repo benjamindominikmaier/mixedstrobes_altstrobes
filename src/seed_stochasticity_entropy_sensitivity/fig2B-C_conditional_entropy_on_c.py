@@ -5,7 +5,7 @@ import random
 import math
 from collections import defaultdict
 
-import indexing_Maier_altstrobes as indexing
+import indexing_Maier_altstrobes_new_multi as indexing
 
 # try:
 #     import matplotlib
