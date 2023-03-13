@@ -206,7 +206,7 @@ minstrobes  &  (2, 15, 25, 50)  &  67.0 & 75.7 & 96.2 & 2.1  &  0.01
 
 ## matching_analysis_bio
 
-The script is used to compute the matching metrics (as definied in Sahlin 2021 [LINK](https://www.genome.org/cgi/doi/10.1101/gr.275648.121)) of biological sequences for all strobemer methods. The query sequences (`--queries`) are split up in 
+The script is used to compute the matching metrics (as definied in Sahlin 2021 [LINK](https://www.genome.org/cgi/doi/10.1101/gr.275648.121)) as well as providing an ANI-estimation of biological sequences for all strobemer methods. The query sequences (`--queries`) are split up in 
 disjoint segments of length (`--segment`) and mapped to the reference (`--references`) before the collinear chain solution of raw unmerged hits is determined for each segment and the matching metrics computed from it. The collinear chain solution takes only the longest collinear chain of hits into account, thus assuming the most likely location and avoiding to overcount "spurious" hits (see Sahlin, 2021 [LINK](https://www.genome.org/cgi/doi/10.1101/gr.275648.121)). Details on implementation are found in [bioRxiv LINK](https://www.biorxiv.org/content/10.1101/2022.10.13.512198) Supplementary Section S4.
 
 ### Usage
@@ -454,6 +454,110 @@ optional arguments:
 ### Output
 
 This script produces csv.files with the following columns: `w_min,w_max,type,x,m,y,mean_error_y_est,analysis,ymetric` as well as corresponding plots. The y-metric is either `p_match` or `Entropy`.
+
+## ANI-estimation using Mash Distance
+
+We estimated the average nucleotide identity u
+
+### Usage (average_nucleotide_identity.py)
+
+Using default settings, the script `average_nucleotide_identity.py` generates 1,000 sequence pairs with mutation frequencies ranging from 0.5% to 10% estimates. Subsequently, the 20,000 sequence pairs are seeded with (spaced) $k$-mers ($k$ = 30) and strobemers (2,15,25,50) before the Mash distance is computed using the number of matching seeds. The Mash distance ([Ondov et al., 2016](https://doi.org/10.1186/s13059-016-0997-x)) is an alignment-free ANI estimation approach and is given as
+
+\begin{equation}
+I(A,B){\mathrm{/}}100 = 1 + \frac{1}{k} \times {\mathrm{ln}}\left( {\frac{{2 \cdot J(A,B)}}{{1 + J(A,B)}}} \right)
+\end{equation}
+
+As the Mash distance was specifically designed for $k$-mers, we we introduced a correction term $cf * (1 - I(A,B))$ and fitted the correction factor individually for $k$-mers (0.075), dense and sparse spaced $k$-mers (0.3 & 0.6), and strobemers (0.165).
+```
+usage: average_nucleotide_identity.py [-h] [--L L] [--nr_exp NR_EXP]
+                                      [--experiment_type EXPERIMENT_TYPE]
+                                      [--subs_freq SUBS_FREQ]
+                                      [--mut_freqs MUT_FREQS [MUT_FREQS ...]]
+                                      [--k_size K_SIZE] [--w W]
+                                      [--orders ORDERS [ORDERS ...]]
+                                      [--w_low W_LOW] [--w_high W_HIGH]
+                                      [--strobe_fractions STROBE_FRACTIONS [STROBE_FRACTIONS ...]]
+                                      [--all_methods] [--method METHOD]
+                                      [--altstrobes_generalized]
+                                      [--altstrobes_size_distribution]
+                                      [--multistrobes]
+                                      [--multistrobes_size_distribution]
+                                      [--k_boundary K_BOUNDARY]
+                                      [--mixedstrobes]
+                                      [--mixedstrobes_methods MIXEDSTROBES_METHODS]
+                                      [--verbose]
+
+Estimate ANI on simulated sequences using Strobemer-adapted Mash distance
+
+options:
+  -h, --help            show this help message and exit
+  --L L                 Length of simulated sequences (default: 1000)
+  --nr_exp NR_EXP       Number of simulated experiments (default: 1000)
+  --experiment_type EXPERIMENT_TYPE
+                        experiment type choose between "all", "controlled",
+                        "specified" or "only_subs" (default: all)
+  --subs_freq SUBS_FREQ
+                        substitution frequency among all mutations for
+                        --experiment_type "specified"; rest split evenly in
+                        insertions and deletions (default: 0.33)
+  --mut_freqs MUT_FREQS [MUT_FREQS ...]
+                        mutation frequencies [0,1] (default: [0.005, 0.01,
+                        0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05,
+                        0.055, 0.06, 0.065, 0.07, 0.075, 0.08, 0.085, 0.09,
+                        0.095, 0.1])
+  --k_size K_SIZE       k-mer/strobemer length (default: 30)
+  --w W                 number of hashes used in a sliding window for thinning
+                        (w=1 means no thinning) (default: 1)
+  --orders ORDERS [ORDERS ...]
+                        List with orders of strobes to be analzyed (default:
+                        [2])
+  --w_low W_LOW         minimum window offset to the previous window (wMin >
+                        0) (default: 25)
+  --w_high W_HIGH       maximum window offset to the previous window (wMin <=
+                        wMax) (default: 50)
+  --strobe_fractions STROBE_FRACTIONS [STROBE_FRACTIONS ...]
+                        Fraction of sampled strobemers, rest kmers (default:
+                        [0.8])
+  --all_methods         perform matching analysis on simulated data for all
+                        (mixed-)strobemer and (mixed-)altstrobe seeding
+                        techniques (default: False)
+  --method METHOD       choose seeding technique (default: none)
+  --altstrobes_generalized
+                        perform matching analysis on simulated data for
+                        altstrobes of all combinations from (1,k-1) to
+                        (k/2,k/2) (default: False)
+  --altstrobes_size_distribution
+                        perform matching analysis on simulated data for
+                        altstrobes with strobe size distribution (k_s, k_l)
+                        determined by strobe_fraction (default: False)
+  --multistrobes        perform matching analysis on simulated data for
+                        multistrobes of all combinations from
+                        (k_boundary,k-k_boundary) to (k/2,k/2) (default:
+                        False)
+  --multistrobes_size_distribution
+                        perform matching analysis on simulated data for
+                        multistrobes of all combinations from
+                        (k_boundary,k-k_boundary) to (k/2,k/2) with strobe
+                        size distribution (k_s, k_l) determined by
+                        strobe_fraction (default: False)
+  --k_boundary K_BOUNDARY
+                        minimum strobe length (k >= 4 recommended to ensure
+                        uniqueness) (default: 5)
+  --mixedstrobes        perform matching analysis on simulated data for user
+                        defined mixed seeding techniques (default: False)
+  --mixedstrobes_methods MIXEDSTROBES_METHODS
+                        List with two seeding methods to sample mixedstrobes
+                        (default: ['randstrobes', 'kmers'])
+  --verbose
+```
+
+### Output
+
+This script produces a plain text document with the following columns: 
+Method & Setting & ANI-estimation (for each read, CSV format) & Mutation Frequency
+```
+kmers & - & 0.9950,0.9957,0.9952,0.9950 & 0.005
+```
 
 ## Figures in Maier & Sahlin, 2023
 
