@@ -68,8 +68,8 @@ w_min,w_max,type,x,m,y,mean_error_y_est,analysis,ymetric
 50,100,mixed-randstrobes,0.8,68,28.956999999999997,-,mixedstrobes-analysis,p_match
 50,100,mixed-randstrobes,0.9,68,29.00800000000001,-,mixedstrobes-analysis,p_match
 50,100,randstrobes,1.0,68,28.711999999999996,-,mixedstrobes-analysis,p_match
-50,100,multistrobes,1,68,28.012,-,multistrobes-analysis,p_match
-50,100,multistrobes,2,68,29.09899999999999,-,multistrobes-analysis,p_match
+50,100,multistrobes,1,68,28.83899999999999,-,multistrobes-analysis,p_match
+50,100,multistrobes,2,68,28.958,-,multistrobes-analysis,p_match
 50,100,multistrobes,3,68,29.163,-,multistrobes-analysis,p_match
 50,100,multistrobes,4,68,29.178,-,multistrobes-analysis,p_match
 50,100,multistrobes,5,68,29.186000000000018,-,multistrobes-analysis,p_match

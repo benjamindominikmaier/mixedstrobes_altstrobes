@@ -1,5 +1,24 @@
 #!/usr/bin/env python3.9
 # -*- coding: utf-8 -*
+
+"""Short Description.
+
+Long Description
+"""
+
+__authors__ = ["Benjamin D. Maier"]
+__copyright__ = "Copyright Benjamin D. Maier & Kristoffer Sahlin | Sahlin Group"
+__organization__ = "Department of Mathematics, Science for Life Laboratory, Stockholm University, 106 91, Stockholm, Sweden."
+__credits__ = ["Benjamin D. Maier & Kristoffer Sahlin"]
+__contact__ = "bmaier [at] ebi.ac.uk"
+__date__ = "2023/03/10"
+__created__ = "2022/06/XX"
+__deprecated__ = False
+__license__ = "MIT"
+__maintainer__ = "Kristoffer Sahlin"
+__email__ = "kristoffer.sahlin [at] scilifelab.se"
+__status__ = "DSML Lvl. 1 - Concept"
+
 import sys
 import operator
 import random
@@ -1601,18 +1620,46 @@ def seq_to_altstrobes_continous_iter_strings(seq: str, k_size: int, strobe_w_min
     else:
         k_size_options = int(len(hash_seq_lists)/2+1)
 
+    if k_boundary == 1:
+        hash_dict = {"AA": 1, "AC": 9, "AG": 19, "AT": 27,
+                    "CA": 14, "CC": 3, "CG": 11, "CT": 21,
+                    "GA": 23, "GC": 16, "GG": 5, "GT": 13,
+                    "TA": 29, "TC": 25, "TG": 17, "TT": 7}
+    # 1,3,5,7,9,11,13,14,16,17,19,21,23,25,27,29
+
+    if k_boundary == 2:
+        hash_dict = {"AA": 2, "AC": 9, "AG": 19, "AT": 26,
+                    "CA": 14, "CC": 4, "CG": 11, "CT": 21,
+                    "GA": 23, "GC": 16, "GG": 6, "GT": 13,
+                    "TA": 28, "TC": 24, "TG": 17, "TT": 7}
+    # 2,4,6,7,9,11,13,14,16,17,19,21,23,24,26,28
+
     for p1, (p1, m1) in enumerate(hash_seq_lists_thinned[0]):  # [:-k_size]:
         if p1 >= min(len(hash_seq_lists[0]) - (order-1)*k_boundary, len(hash_seq_lists[-1]) - (order-1)*(k_size-k_boundary)):
             break
 
-        k_size_selection = hash(m1) % k_size_options
-        k_size_2_selection = -(k_size_selection+1)
-        k_size1 = k_size_selection + k_boundary
-        k_size2 = k_size - k_size1
-        # print(m1, k_size_options, k_size1, k_size2)
-        m1 = hash_seq_lists[k_size_selection][p1][1]
+        if k_boundary > 2:
+            k_size_selection = hash(m1) % k_size_options
+            k_size_2_selection = -(k_size_selection+1)
+            k_size1 = k_size_selection + k_boundary
+            k_size2 = k_size - k_size1
+            # print(m1, k_size_options, k_size1, k_size2)
+            m1 = hash_seq_lists[k_size_selection][p1][1]
+        elif k_boundary == 1:
+            m1 = hash_seq_lists[1][p1][1]
+            k_size1 = hash_dict[m1]
+            k_size2 = k_size - k_size1
+            k_size_selection = k_size1 - k_boundary
+            k_size_2_selection = k_size2 - k_boundary
+            m1 = hash_seq_lists[k_size_selection][p1][1]
+        elif k_boundary == 2:
+            k_size1 = hash_dict[m1]
+            k_size2 = k_size - k_size1
+            k_size_selection = k_size1 - k_boundary
+            k_size_2_selection = k_size2 - k_boundary
+            m1 = hash_seq_lists[k_size_selection][p1][1]
 
-        if hash(m1) // 100 % 2 == arg: # first k_size1, then k_size2 (e.g. 10-20)
+        if (k_boundary < 3) or (hash(m1) // 100 % 2 == arg): # first k_size1, then k_size2 (e.g. 10-20)
             # print(1, k_size1, k_size2)
             if p1 + (order-1) * strobe_w_max_offsets[k_size_2_selection] <= len(hash_seq_lists[k_size_2_selection]):
                 windows = list()

@@ -1,3 +1,24 @@
+#!/usr/bin/env python3.9
+# -*- coding: utf-8 -*
+
+"""Short Description.
+
+Long Description
+"""
+
+__authors__ = ["Kristoffer Sahlin"]
+__copyright__ = "Copyright Benjamin D. Maier & Kristoffer Sahlin | Sahlin Group"
+__organization__ = "Department of Mathematics, Science for Life Laboratory, Stockholm University, 106 91, Stockholm, Sweden."
+__credits__ = ["Benjamin D. Maier & Kristoffer Sahlin"]
+__contact__ = "kristoffer.sahlin [at] scilifelab.se"
+__date__ = "2023/03/10"
+__created__ = "2022/XX/XX"
+__deprecated__ = False
+__license__ = "MIT"
+__maintainer__ = "Kristoffer Sahlin"
+__email__ = "kristoffer.sahlin [at] scilifelab.se"
+__status__ = "DSML Lvl. 1 - Concept"
+
 import os,sys
 import argparse
 
