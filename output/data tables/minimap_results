@@ -1,4 +1,4 @@
-seeding&settings&mut_freq&total time [s]&indexing time [s]&aligning time [s]&peak RSS [Gb]&mapped correctly [%]&bases covered [%]&distinct minimzers&singletons [%]&average occurrences&average spacing
+seeding&settings&mut_freq&total time [s]&indexing time [s]&aligning time [s]&peak RSS [Gb]&mapped correctly [%]&bases covered [%]&distinct minimizers&singletons [%]&average occurrences&average spacing
 kmers&(15)&0&1481&86&1394&11.868&99.5&99.5&100277218&38.7&5.856&5.308
 kmers&(15)&0.01&1351&86&1220&11.868&99.5&99.5&100277218&38.7&5.856&5.308
 kmers&(15)&0.05&981&92&889&11.868&99.45&99.4&100277218&38.7&5.856&5.308
