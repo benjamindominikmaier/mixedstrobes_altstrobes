@@ -1,10 +1,15 @@
+#! /usr/bin/env python
+# -*- coding: utf-8 -*
+
+"""Compute Collinear Chains
+
+Long Description
+"""
 
 from time import time
 import queue
 import random
 import copy
-
-
 
 
 class Node:

@@ -1,5 +1,27 @@
 #!/usr/bin/env python3.9
 # -*- coding: utf-8 -*
+
+"""Compute fraction of correctly mapped reads from minimap2 results
+
+This script takes a SAM output file from minimap2-strobemers (--input_file) and
+computes the fraction of correctly mapped reads (as defined by the existence of
+an overlap between query and reference position and right direction) and the
+average (mean) number of correctly mapped nucleotides.
+"""
+
+__authors__ = ["Benjamin D. Maier"]
+__copyright__ = "Copyright Benjamin D. Maier & Kristoffer Sahlin | Sahlin Group"
+__organization__ = "Department of Mathematics, Science for Life Laboratory, Stockholm University, 106 91, Stockholm, Sweden."
+__credits__ = ["Benjamin D. Maier & Kristoffer Sahlin"]
+__contact__ = "bmaier [at] ebi.ac.uk"
+__date__ = "2023/03/10"
+__created__ = "2022/07/25"
+__deprecated__ = False
+__license__ = "MIT"
+__maintainer__ = "Kristoffer Sahlin"
+__email__ = "kristoffer.sahlin [at] scilifelab.se"
+__status__ = "DSML Lvl. 1 - Concept"
+
 import os
 import sys
 import csv

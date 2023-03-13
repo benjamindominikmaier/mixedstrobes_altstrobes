@@ -1,11 +1,10 @@
+#!/usr/bin/env python3.9
+# -*- coding: utf-8 -*
+
 '''
     Below awesome fast[a/q] reader function taken
     from https://github.com/lh3/readfq/blob/master/readfq.py
 '''
-
-
-def Test(a):
-    return hash(a)
 
 
 def readfq(fp): # this is a generator function

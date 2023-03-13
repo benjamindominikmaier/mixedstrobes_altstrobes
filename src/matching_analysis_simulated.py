@@ -1,5 +1,63 @@
 #!/usr/bin/env python3.9
 # -*- coding: utf-8 -*
+
+"""Compute the matching metrics of simulated sequences with various mutation rates and all strobemer methods.
+
+Matching Metrics (as defined in Sahlin, 2021):
+- Fraction of Matches: proportion of the query seeds that matched the query
+- Match Coverage: proportion of nucleotides covered by the k-mers and
+strobemers from end-to-end including potential gaps
+- Sequence Coverage: proportion of nucleotides covered by the strobes of matches,
+so it distinguished from match coverage by disregarding the gaps between the strobes
+- Expected Island Size: An island is the maximal interval of consecutive nucleotides
+without matches. If a random location from the reference genome is selected, they
+may either be covered by matches (size of island = 0) or islands of various length. For
+a sequence S and a set of islands length X, the expected island size E is computed as
+follows: E = 1 / |S| Σ(x²)
+
+
+When running the script without specifying any parameters (as in Maier & Sahlin, 2023),
+1000 random DNA sequences (--nr_exp) of length 10,000nt (--nr_exp) are generated
+and subsequently mutated with mutation frequencies of 0.01, 0.05 and 0.1
+(--mut_freqs) and equal chance for insertions, deletions and substitutions
+(see --experiment_type) to obtain corresponding query sequences. It is also
+possible to specify substitution rate using --experiment_type "specified" and
+--subs_freq <float>, whereby the rest (1- subs_frq) will be split evenly in
+insertions and deletions.
+
+In the default mode, the sequences are seeded with all available methods
+(kmers", "spaced_kmers_dense", "spaced_kmers_sparse", "minstrobes",
+"randstrobes", "hybridstrobes", "altstrobes", "mixedminstrobes",
+"mixedrandstrobes", "mixedhybridstrobes", "mixedaltstrobes) and strobemer
+settings (2,15,25,50) (see --k_size, --w, --orders, --w_low, --w_high).
+
+By default, mixedstrobes are analyzed with strobe fractions ranging from
+0.1 to 0.9, which can be changed using --strobe_fractions.
+
+However, it is also possible to specify only one seeding technique using the
+--method parameter or sample generalized_altstrobes using --altstrobes_generalized.
+When sampling generalized altstrobes, the matching analysis is performed for
+altstrobes of all combinations from (1,k-1) to (k/2,k/2), whereby a lower
+boundary can be specified using --k_boundary, which is recommended as altstrobes
+with k_s < 5 cause uniqueness issues and thus bad performance.
+Additionally, we implemented the possibility to sample e.g. strobemer-strobemer
+combinations using the --mixedstrobes parameter, which allows to sample a mix of
+any two techniques with distributions given by --strobe_fractions.
+"""
+
+__authors__ = ["Benjamin D. Maier"]
+__copyright__ = "Copyright Benjamin D. Maier & Kristoffer Sahlin | Sahlin Group"
+__organization__ = "Department of Mathematics, Science for Life Laboratory, Stockholm University, 106 91, Stockholm, Sweden."
+__credits__ = ["Benjamin D. Maier & Kristoffer Sahlin"]
+__contact__ = "bmaier [at] ebi.ac.uk"
+__date__ = "2023/03/10"
+__created__ = "2022/02/XX"
+__deprecated__ = False
+__license__ = "MIT"
+__maintainer__ = "Kristoffer Sahlin"
+__email__ = "kristoffer.sahlin [at] scilifelab.se"
+__status__ = "DSML Lvl. 1 - Concept"
+
 import os
 import sys
 import argparse
@@ -824,6 +882,7 @@ if __name__ == '__main__':
     parser.add_argument('--experiment_type', type=str, default="all", help='experiment type choose between "all", "controlled", "specified" or "only_subs"')
     parser.add_argument('--subs_freq', type=float, default=0.33, help='substitution frequency among all mutations for --experiment_type "specified"; rest split evenly in insertions and deletions')
     parser.add_argument('--mut_freqs', nargs='+', type=float, default=[0.01, 0.05, 0.10], help='mutation frequencies [0,1]')
+    #parser.add_argument('--mut_freqs', nargs='+', type=float, default=[0.01 * x for x in range(0,26)], help='mutation frequencies [0,1]')
     parser.add_argument('--k_size', type=int, default=30, help='k-mer/strobemer length')
     parser.add_argument('--w', type=int, default=1, help='number of hashes used in a sliding window for thinning (w=1 means no thinning)')
     #parser.add_argument('--orders', type=list, default=[4, ], help='List with orders of strobes to be analzyed')

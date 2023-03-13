@@ -1,4 +1,21 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*
+
+"""Compute Genome Mapping Metrics using collinear chaining
+"""
+
+__authors__ = ["Benjamin D. Maier & Kristoffer Sahlin"]
+__copyright__ = "Copyright Benjamin D. Maier & Kristoffer Sahlin | Sahlin Group"
+__organization__ = "Department of Mathematics, Science for Life Laboratory, Stockholm University, 106 91, Stockholm, Sweden."
+__credits__ = ["Benjamin D. Maier & Kristoffer Sahlin"]
+__contact__ = "bmaier [at] ebi.ac.uk"
+__date__ = "2023/03/10"
+__created__ = "2022/02/XX"
+__deprecated__ = False
+__license__ = "MIT"
+__maintainer__ = "Kristoffer Sahlin"
+__email__ = "kristoffer.sahlin [at] scilifelab.se"
+__status__ = "DSML Lvl. 1 - Concept"
 
 import argparse
 import sys, os
@@ -325,7 +342,8 @@ def n_logn_read_coverage(mems):
         elif value == 0: # first j (i.e. j=0)
             trace_vector[j+1]= 0
         else:
-            trace_vector[j+1] = j_prime +1
+            trace_vector[j+1] = j_prime + 1
+            # trace_vector[j+1] = j_prime +1
 
         RMaxQST.update(T, leaf_to_update, value, n) # point update
         RMaxQST.update(I, leaf_to_update, value - mem.d, n) # point update

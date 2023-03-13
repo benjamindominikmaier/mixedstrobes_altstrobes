@@ -1,4 +1,30 @@
 #! /usr/bin/env python
+# -*- coding: utf-8 -*
+
+"""Efficient string matching using strobemers
+
+StrobeMap_Maier is a program which roughly has the same interface as MUMmer.
+StrobeMap_Maier takes a reference and query file in multi-fasta or fastq format.
+It produces NAMs (Non-overlapping Approximate Matches) between the queries and
+references and outputs them in a format simular to nucmer/MUMmer.
+
+See supplementary material Section A in Sahlin, 2021 for definition of NAMs.
+StrobeMap_Maier is derived from StrobeMap (https://github.com/ksahlin/strobemers),
+by which it differy by the implementation of mixedstrobes, altstrobes and multistrobes.
+"""
+
+__authors__ = ["Benjamin D. Maier & Kristoffer Sahlin"]
+__copyright__ = "Copyright Benjamin D. Maier & Kristoffer Sahlin | Sahlin Group"
+__organization__ = "Department of Mathematics, Science for Life Laboratory, Stockholm University, 106 91, Stockholm, Sweden."
+__credits__ = ["Benjamin D. Maier & Kristoffer Sahlin"]
+__contact__ = "bmaier [at] ebi.ac.uk"
+__date__ = "2023/03/10"
+__created__ = "2022/02/XX"
+__deprecated__ = False
+__license__ = "MIT"
+__maintainer__ = "Kristoffer Sahlin"
+__email__ = "kristoffer.sahlin [at] scilifelab.se"
+__status__ = "DSML Lvl. 1 - Concept"
 
 from __future__ import print_function
 import os

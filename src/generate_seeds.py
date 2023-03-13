@@ -1,5 +1,30 @@
 #!/usr/bin/env python3.9
 # -*- coding: utf-8 -*
+
+"""Sample reads from a reference genome for minimap2 benchmarking
+
+This script samples reads (nr_exp) from a reference (--reference) and mutates
+them for the different experimental conditions (--mut_freqs). The sampled reads
+(unmutated and mutated) are saved to different output files (--prefix) in the
+outfolder (--outfolder). The reads are sampled from random positions of the
+reference and it is possible to specify whether sampled reads may contain
+unspecified nucleotides using --tolerate_N. In our analysis, this script is used
+to produce simulated reads for the minimap analysis (see next section).
+"""
+
+__authors__ = ["Benjamin D. Maier"]
+__copyright__ = "Copyright Benjamin D. Maier & Kristoffer Sahlin | Sahlin Group"
+__organization__ = "Department of Mathematics, Science for Life Laboratory, Stockholm University, 106 91, Stockholm, Sweden."
+__credits__ = ["Benjamin D. Maier & Kristoffer Sahlin"]
+__contact__ = "bmaier [at] ebi.ac.uk"
+__date__ = "2023/03/10"
+__created__ = "2022/02/XX"
+__deprecated__ = False
+__license__ = "MIT"
+__maintainer__ = "Kristoffer Sahlin"
+__email__ = "kristoffer.sahlin [at] scilifelab.se"
+__status__ = "DSML Lvl. 1 - Concept"
+
 import os
 import sys
 import argparse
