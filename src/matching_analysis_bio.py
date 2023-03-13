@@ -1,4 +1,40 @@
-#! /usr/bin/env python
+#!/usr/bin/env python
+# -*- coding: utf-8 -*
+
+"""Compute the matching metrics of long sequence reads with various mutation rates and all strobemer methods.
+
+Matching Metrics (as defined in Sahlin, 2021):
+- Fraction of Matches: proportion of the query seeds that matched the query
+- Match Coverage: proportion of nucleotides covered by the k-mers and
+strobemers from end-to-end including potential gaps
+- Sequence Coverage: proportion of nucleotides covered by the strobes of matches,
+so it distinguished from match coverage by disregarding the gaps between the strobes
+- Expected Island Size: An island is the maximal interval of consecutive nucleotides
+without matches. If a random location from the reference genome is selected, they
+may either be covered by matches (size of island = 0) or islands of various length. For
+a sequence S and a set of islands length X, the expected island size E is computed as
+follows: E = 1 / |S| Σ(x²)
+
+The query sequences (--queries) are split up in disjoint segments of length
+(--segment) and mapped to the reference (--references) before the collinear
+chain solution of raw unmerged hits is determined for each segment and the
+matching metrics computed from it. The collinear chain solution takes only the
+longest collinear chain of hits into account, thus assuming the most likely
+location and avoiding to overcount "spurious" hits (see Sahlin, 2021). 
+"""
+
+__authors__ = ["Benjamin D. Maier & Kristoffer Sahlin"]
+__copyright__ = "Copyright Benjamin D. Maier & Kristoffer Sahlin | Sahlin Group"
+__organization__ = "Department of Mathematics, Science for Life Laboratory, Stockholm University, 106 91, Stockholm, Sweden."
+__credits__ = ["Benjamin D. Maier & Kristoffer Sahlin"]
+__contact__ = "bmaier [at] ebi.ac.uk"
+__date__ = "2023/03/10"
+__created__ = "2022/02/XX"
+__deprecated__ = False
+__license__ = "MIT"
+__maintainer__ = "Kristoffer Sahlin"
+__email__ = "kristoffer.sahlin [at] scilifelab.se"
+__status__ = "DSML Lvl. 1 - Concept"
 
 from __future__ import print_function
 import os
@@ -22,6 +58,49 @@ from modules import indexing_Maier_altstrobes as indexing
 BITS = sys.hash_info.width
 MAX = sys.maxsize
 MAX_HASH_VALUE = int((2**BITS)/2) - 1
+
+
+def get_update_solutions(solutions, chrom_nams):
+    updated_solutions = []
+    nr_seeds = 0
+
+    min_x = solutions[0].x
+    min_c = solutions[0].c
+    max_y = solutions[0].y
+    max_d = solutions[0].d
+    max_x = solutions[0].x
+    max_c = solutions[0].c
+    for solution in solutions:
+        #print(solution)
+        if (solution.x >= min_x) & (solution.x <= max_y) & (solution.c >= min_c) & (solution.c <= max_d):
+            max_x = max(max_x, solution.x)
+            max_c = max(max_c, solution.c)
+            max_y = max(max_y, solution.y)
+            max_d = max(max_d, solution.d)
+        else:
+            for chrom_nam in chrom_nams:
+                if ((chrom_nam.x >= min_x) & (chrom_nam.x <= max_y) & (chrom_nam.c >= min_c) & (chrom_nam.c <= max_d)):
+                    if chrom_nam not in updated_solutions:
+                        updated_solutions.append(chrom_nam)
+                        max_x = max(max_x, chrom_nam.x)
+                        max_c = max(max_c, chrom_nam.c)
+            nr_seeds += max_c + max_x - min_c - min_x + 2
+            min_x = solution.x
+            min_c = solution.c
+            max_x = solution.x
+            max_c = solution.c
+            max_y = solution.y
+            max_d = solution.d
+
+    for chrom_nam in chrom_nams:
+        if (chrom_nam.x >= min_x) & (chrom_nam.x <= max_y) & (chrom_nam.c >= min_c) & (chrom_nam.c <= max_d):
+            if chrom_nam not in updated_solutions:
+                updated_solutions.append(chrom_nam)
+                max_x = max(max_x, chrom_nam.x)
+                max_c = max(max_c, chrom_nam.c)
+    nr_seeds += max_c + max_x - min_c - min_x + 2
+
+    return updated_solutions, nr_seeds
 
 
 def reverse_complement(seq: str) -> str:
@@ -333,9 +412,6 @@ def build_altstrobe_index(refs, k_size1: int, k_size2: int,
     idx = defaultdict(lambda: array("L"))
     ref_id_to_accession = {}
     cntr = 0
-
-    k_size1 = 10
-    k_size2 = 20
 
     for r_id, (ref_acc, (seq, _)) in enumerate(help_functions.readfq(refs)):
         ref_id_to_accession[r_id] = ref_acc
@@ -752,7 +828,6 @@ def main(args):
         print("kmers")
         print(f'k: {args.k}')
 
-
     if args.strobe_fraction:
         fraction = Fraction(str(args.strobe_fraction))
         denominator = fraction.denominator
@@ -760,6 +835,7 @@ def main(args):
 
     if args.kmer_index:
         args.n = 1
+        total_bases_covered = args.k
         idx, ref_id_to_accession, cntr = build_kmer_index(open(args.references, 'r'), args.k, w)
         print("{0} kmers created from references\n".format(cntr))
         # print(idx)
@@ -773,7 +849,6 @@ def main(args):
         idx, ref_id_to_accession, cntr = build_hybridstrobe_index(open(args.references, 'r'), args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)
         print("{0} hybridstrobes created from references\n".format(cntr))
     elif args.altstrobe_index:
-        args.k = int(2*args.k/3)
         idx, ref_id_to_accession, cntr = build_altstrobe_index(open(args.references, 'r'), args.k, 2*args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)
         print("{0} altstrobes created from references\n".format(cntr))
     elif args.multistrobe_index:
@@ -789,19 +864,24 @@ def main(args):
         idx, ref_id_to_accession, cntr = build_mixedhybridstrobe_index(open(args.references, 'r'), args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)
         print("{0} mixedhybridstrobes created from references\n".format(cntr))
     elif args.mixedaltstrobe_index:
-        args.k = int(2*args.k/3)
         idx, ref_id_to_accession, cntr = build_mixedaltstrobe_index(open(args.references, 'r'), args.k, 2*args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n, denominator, numerator)
         print("{0} mixedaltstrobes created from references\n".format(cntr))
     else:
         print("No (known) seeding technique was selected.")
         raise NameError
 
+    if args.altstrobe_index | args.mixedaltstrobe_index:
+        total_bases_covered = int(1.5 * args.k * args.n)
+    else:
+        total_bases_covered = args.k * args.n
+    print(total_bases_covered, args.k, args.n)
+
     outfile = open(os.path.join(args.outfolder, args.prefix + ".txt"), 'w')
     outfile_summary = open(os.path.join(args.outfolder, args.prefix + " (Summary).txt"), 'w')
     print("\nProcessing query sequences")
     for n_query_sequences, (acc, (full_seq, _)) in enumerate(help_functions.readfq(open(args.queries, 'r'))):
         print("Processing query sequence #", n_query_sequences, "of length", len(full_seq))
-        results = {"m": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0, "coll": 0}
+        results = {"m": 0, "nm": 0, "mp": 0, "sc": 0, "gaps": [], "mc": 0, "coll": 0, "ANI": []}
 
         for segment in range(math.ceil(len(full_seq)/args.segment)):
             seq = full_seq[segment*args.segment:segment*args.segment+args.segment]
@@ -866,7 +946,7 @@ def main(args):
                         read_matches_rc = get_unmerged_matches(strobes_rc, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n)
 
                     elif args.minstrobe_index:
-                        strobes_rc = [(positions, h) for positions, h in indeing.seq_to_minstrobes_iter(reverse_complement(seq), args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)]
+                        strobes_rc = [(positions, h) for positions, h in indexing.seq_to_minstrobes_iter(reverse_complement(seq), args.k, args.strobe_w_min_offset, args.strobe_w_max_offset, PRIME, w, args.n)]
                         read_matches_rc = get_unmerged_matches(strobes_rc, idx, args.k, ref_id_to_accession, acc, args.selfalign, args.n)
 
                     elif args.randstrobe_index:
@@ -920,15 +1000,16 @@ def main(args):
                         chrom_nams = nams[ref_id]
                         total_disjoint_matches += len(chrom_nams)
                         solutions, opt_cov = n_logn_read_coverage(chrom_nams)
+                        solutions, cc_len = get_update_solutions(solutions[0], chrom_nams)
                         # pick best from forward and reverse strand
                         if q_acc in read_coverage_solution:
-                            c_prev, _ = read_coverage_solution[q_acc]
+                            c_prev, _, _ = read_coverage_solution[q_acc]
                             if c_prev < opt_cov:
                                 # print(ref_id, opt_cov)
-                                read_coverage_solution[q_acc] = (opt_cov, solutions[0])
+                                read_coverage_solution[q_acc] = (opt_cov, solutions, cc_len)
                         else:
                             # print(ref_id, opt_cov)
-                            read_coverage_solution[q_acc] = (opt_cov, solutions[0])
+                            read_coverage_solution[q_acc] = (opt_cov, solutions, cc_len)
 
                 tot_genome_length = tot_genome_length/2 # remove double counting of reverse complements
                 collinear_chain_nam_sizes = []
@@ -938,11 +1019,12 @@ def main(args):
                 gaps = []
                 gap_pos = 0
                 m = 0
-
+                nm = 2* len(strobes)
                 # collinear_outfile = open("collinear_matches_out.tsv", "w")
                 for q_acc in read_coverage_solution:
                     # collinear_outfile.write("> {0}\n".format(q_acc))
-                    opt_cov, solution = read_coverage_solution[q_acc]
+                    opt_cov, solution, cc_len = read_coverage_solution[q_acc]
+                    # nm += cc_len
                     total_bp_covered += opt_cov
                     for n in solution:
                         collinear_chain_nam_sizes.append(n.y - n.x)
@@ -955,7 +1037,7 @@ def main(args):
                         gap_pos = n.d
                         # collinear_outfile.write("  {0} {1} {2} {3}\n".format(n.chr_id, n.x, n.c, n.val))
 
-                gaps.append(len(seq)-gap_pos)
+                gaps.append(len(seq)-gap_pos-1)
                 coll_esize = e_size(collinear_chain_nam_sizes, tot_genome_length)
                 # collinear_outfile.close()
 
@@ -967,27 +1049,39 @@ def main(args):
                 else:
                     seeds = len(strobes)
 
+                nm -= m
+                if m >= nm:
+                    m = nm
+                    ANI = 1
+                elif m > 0:
+                    ANI = 1 + 1/total_bases_covered * math.log((2*(m/nm))/(1+(m/nm)))
+                else:
+                    ANI = 0
+
                 if seeds > 1:
-                    outfile.write("{0} & {1} & {2} & {3} & {4} & {5} & {6} & {7} & {8} & {9}\n".format(
+                    outfile.write("{0} & {1} & {2} & {3} & {4} & {5} & {6} & {7} & {8} & {9} & {10} & {11}\n".format(
                         n_query_sequences+1, # read number
                         len(full_seq), # read length
                         segment+1, # segment number
                         len(seq), # sequence length
-                        total_disjoint_matches, # m
+                        m, # m
+                        nm, #non-matches inside collinear chain
                         round(m/seeds*2, 2), # mp
                         round(sc/len(seq), 2), # sc
                         round(total_bp_covered/tot_genome_length,2), # mc
                         round(get_e_size(gaps, len(seq), 1),2), # gaps
-                        round(coll_esize/2,1) #coll_esize
+                        round(coll_esize/2,1), #coll_esize
+                        round(ANI, 3)
                     ))
 
                     results["m"] += m
+                    results["nm"] += nm
                     results["mp"] += seeds
                     results["sc"] += sc
                     results["mc"] += total_bp_covered
                     results["gaps"].append(gaps)
                     results["coll"] += coll_esize/2
-
+                    results["ANI"].append(ANI)
 
         flat = [g for l in results["gaps"] for g in l]
         if flat:
@@ -996,12 +1090,22 @@ def main(args):
             q_e_size = get_e_size(flat, len(full_seq), 1)
         # else:
         #     avg_island_len = 0
+        if results["m"] >= results["nm"]:
+            ANI = 1
+        elif results["m"] > 0:
+            ANI = 1 + 1/total_bases_covered * math.log((2*(results["m"]/results["nm"]))/(1+(results["m"]/results["nm"])))
+        else:
+            ANI = 0
+
         res = [
             round(100*results["m"]*2/results["mp"], 1), # account for the fact that a seed can only match one direction (see collinear solution)
             100*results["sc"]/len(full_seq),
             100*results["mc"]/len(full_seq),
             q_e_size,
-            results["coll"]
+            results["coll"],
+            results["m"],
+            results["nm"],
+            ANI # ANI
         ]
         outfile_summary.write(
         ">Query " + str(n_query_sequences+1) + " & " + str(len(full_seq)) + " & " + " & ".join([str(round(r, 1)) for r in res])+"\n")
